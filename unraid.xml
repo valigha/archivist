@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>archivist</Name>
+  <Repository>ghcr.io/valigha/archivist:latest</Repository>
+  <Registry>https://ghcr.io/</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project>https://github.com/valigha/archivist</Project>
+  <Overview>Folio (nhentai) and Nexus (HentaiNexus) CBZ archivists in one container. One page with a tab for each, each with its own tags, login and settings, and one shared library folder with the counts shown at the top.</Overview>
+  <Category>MediaApp:Books Downloaders:</Category>
+  <WebUI>http://[IP]:[PORT:8090]/</WebUI>
+  <ExtraParams/>
+  <PostArgs/>
+  <Requires>Stop the separate folio-archivist and nexus-archivist containers before starting this one, so two copies are never downloading into the same library. Each app starts with fresh settings here; log in to Nexus again from its tab.</Requires>
+  <Config Name="WebUI" Target="8090" Default="8090" Mode="tcp" Description="Archivist page (Folio and Nexus tabs)" Type="Port" Display="always" Required="true" Mask="false">8090</Config>
+  <Config Name="Library" Target="/app/library" Default="/mnt/user/media/hentai" Mode="rw" Description="The one shared library folder for both apps. Folio files start with the gallery number, Nexus files start with HN." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/media/hentai</Config>
+  <Config Name="Config" Target="/app/config" Default="/mnt/user/appdata/archivist/config" Mode="rw" Description="Saved settings. Folio uses the folio subfolder, Nexus the nexus subfolder." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/archivist/config</Config>
+  <Config Name="Logs" Target="/app/log" Default="/mnt/user/appdata/archivist/log" Mode="rw" Description="Status and log files (one subfolder per app)" Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/archivist/log</Config>
+  <Config Name="LIBRARY_SPLIT" Target="LIBRARY_SPLIT" Default="10000" Mode="" Description="Split into folders of this many ids. 0 = flat. Used by both apps." Type="Variable" Display="always" Required="false" Mask="false">10000</Config>
+  <Config Name="SLEEP_INTERVAL" Target="SLEEP_INTERVAL" Default="3600" Mode="" Description="Seconds to wait after a cycle. Used by both apps; use FOLIO_SLEEP_INTERVAL or NEXUS_SLEEP_INTERVAL for one." Type="Variable" Display="always" Required="false" Mask="false">3600</Config>
+  <Config Name="FOLIO_NHENTAI_TAGS" Target="FOLIO_NHENTAI_TAGS" Default="" Mode="" Description="Optional starting tags for Folio. Easier to use the chips on the Folio tab." Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="NEXUS_HN_TAGS" Target="NEXUS_HN_TAGS" Default="" Mode="" Description="Optional starting filters for Nexus, separated by spaces: tag:uncensored -tag:unbirth. Easier to use the chips on the Nexus tab." Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="FOLIO_REQUEST_DELAY_MS" Target="FOLIO_REQUEST_DELAY_MS" Default="2000" Mode="" Description="Folio: pause between requests, in ms." Type="Variable" Display="advanced" Required="false" Mask="false">2000</Config>
+  <Config Name="NEXUS_REQUEST_DELAY_MS" Target="NEXUS_REQUEST_DELAY_MS" Default="1500" Mode="" Description="Nexus: pause between page requests, in ms." Type="Variable" Display="advanced" Required="false" Mask="false">1500</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="Unraid nobody" Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Unraid users" Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
+  <Config Name="UMASK" Target="UMASK" Default="002" Mode="" Description="Created file mask" Type="Variable" Display="advanced" Required="false" Mask="false">002</Config>
+  <Config Name="TZ" Target="TZ" Default="America/New_York" Mode="" Description="Timezone" Type="Variable" Display="advanced" Required="false" Mask="false">America/New_York</Config>
+</Container>

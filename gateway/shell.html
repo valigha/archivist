@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Archivist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0c0e; --surface: #14161a; --surface-2: #1b1e24;
+      --fg: #ece8e1; --muted: #8a8680; --line: rgba(236,232,225,0.12);
+      --accent: #7f9a8f; --warn: #c4a574; --danger: #c17b74; --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); }
+    body { font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; display: flex; flex-direction: column; }
+    header {
+      display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+      padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--bg);
+    }
+    h1 { font-family: Newsreader, Georgia, serif; font-weight: 500; font-size: 22px; margin: 0; letter-spacing: -0.02em; }
+    h1 small { font: 400 11px "IBM Plex Sans", sans-serif; color: var(--muted); margin-left: 6px; letter-spacing: 0.04em; }
+    nav { display: flex; gap: 6px; }
+    nav button {
+      background: transparent; color: var(--muted); border: 1px solid transparent; border-radius: 999px;
+      padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+    }
+    nav button:hover { color: var(--fg); }
+    nav button[aria-selected="true"] { color: var(--fg); background: var(--surface); border-color: var(--line); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.run { background: var(--warn); }
+    .dot.ok { background: var(--accent); }
+    .dot.bad { background: var(--danger); }
+    .lib {
+      margin-left: auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 14px; font-size: 13px;
+    }
+    .lib b { font-variant-numeric: tabular-nums; font-size: 16px; letter-spacing: -0.02em; }
+    .lib .part { color: var(--muted); }
+    .lib .part b { color: var(--fg); font-size: 14px; }
+    .lib .sep { width: 1px; align-self: stretch; background: var(--line); }
+    .lib .scan { color: var(--warn); }
+    .lib button { background: none; border: 0; color: var(--muted); text-decoration: underline; font: inherit; font-size: 12px; cursor: pointer; padding: 0; }
+    .lib button:hover:not(:disabled) { color: var(--fg); }
+    .lib button:disabled { opacity: .5; cursor: default; }
+    main { flex: 1; position: relative; min-height: 0; }
+    iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--bg); display: none; }
+    iframe.on { display: block; }
+    @media (max-width: 760px) { .lib { margin-left: 0; width: 100%; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Archivist<small>v__VERSION__</small></h1>
+    <nav role="tablist">
+      <button role="tab" id="tab-folio" data-tab="folio" aria-selected="true">Folio <span class="dot" id="dot-folio"></span></button>
+      <button role="tab" id="tab-nexus" data-tab="nexus" aria-selected="false">Nexus <span class="dot" id="dot-nexus"></span></button>
+    </nav>
+    <div class="lib" id="lib" aria-live="polite">
+      <span>Library <b id="lTotal">…</b></span>
+      <span class="sep"></span>
+      <span class="part">Folio <b id="lFolio">…</b></span>
+      <span class="part">Nexus <b id="lNexus">…</b></span>
+      <span class="part" id="lOtherWrap" hidden>Other <b id="lOther">0</b></span>
+      <span class="sep"></span>
+      <span class="part" id="lNote">&nbsp;</span>
+      <button type="button" id="btnRescan">Rescan</button>
+    </div>
+  </header>
+  <main>
+    <iframe id="f-folio" src="/folio/" title="Folio"></iframe>
+    <iframe id="f-nexus" src="/nexus/" title="Nexus"></iframe>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const TABS = ["folio", "nexus"];
+    function remembered() { try { return localStorage.getItem("archivist-tab"); } catch { return null; } }
+    function show(tab, save) {
+      if (!TABS.includes(tab)) tab = "folio";
+      for (const t of TABS) {
+        $("f-" + t).classList.toggle("on", t === tab);
+        $("tab-" + t).setAttribute("aria-selected", String(t === tab));
+      }
+      if (save) {
+        try { localStorage.setItem("archivist-tab", tab); } catch {}
+        history.replaceState(null, "", "#" + tab);
+      }
+      document.title = (tab === "nexus" ? "Nexus" : "Folio") + " · Archivist";
+    }
+    for (const b of document.querySelectorAll("nav button")) b.addEventListener("click", () => show(b.dataset.tab, true));
+    show(location.hash.slice(1) || remembered() || "folio", false);
+
+    const n = (v) => (v || 0).toLocaleString();
+    function dot(app, a) {
+      const el = $("dot-" + app);
+      if (!a.up) { el.className = "dot bad"; el.title = "not responding"; return; }
+      const busy = ["searching", "downloading", "queued"].includes(a.state);
+      el.className = "dot " + (busy ? "run" : "ok");
+      el.title = (a.state || "running") + (a.version ? " · v" + a.version : "");
+    }
+    async function refresh() {
+      try {
+        const res = await fetch("/api/library", { cache: "no-store" });
+        const d = await res.json();
+        const wait = d.scanning && !d.total;
+        $("lTotal").textContent = wait ? "…" : n(d.total);
+        $("lFolio").textContent = wait ? "…" : n(d.folio);
+        $("lNexus").textContent = wait ? "…" : n(d.nexus);
+        $("lOtherWrap").hidden = !d.other;
+        $("lOther").textContent = n(d.other);
+        const note = $("lNote");
+        if (d.scanning) { note.textContent = "scanning…"; note.className = "part scan"; }
+        else if (d.scannedAt) {
+          const m = Math.max(0, Math.round((Date.now() - Date.parse(d.scannedAt)) / 60000));
+          note.textContent = "checked " + (m < 1 ? "just now" : m + "m ago"); note.className = "part";
+        } else { note.innerHTML = "&nbsp;"; note.className = "part"; }
+        $("btnRescan").disabled = d.scanning;
+        dot("folio", d.apps.folio); dot("nexus", d.apps.nexus);
+      } catch {}
+    }
+    $("btnRescan").addEventListener("click", async () => {
+      $("btnRescan").disabled = true;
+      try { await fetch("/api/rescan", { method: "POST" }); } catch {}
+      refresh();
+    });
+    refresh();
+    setInterval(refresh, 2500);
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+name: archivist
+
+services:
+  archivist:
+    build: .
+    image: archivist:local
+    container_name: archivist
+    restart: unless-stopped
+    mem_limit: 1536m
+    ports:
+      - "8090:8090"
+    environment:
+      PUID: "99"
+      PGID: "100"
+      UMASK: "002"
+      TZ: "America/New_York"
+      LIBRARY_SPLIT: "10000"
+      # Shared by both apps. Give one app its own value with a prefix, e.g.
+      # FOLIO_REQUEST_DELAY_MS / NEXUS_REQUEST_DELAY_MS.
+      SLEEP_INTERVAL: "3600"
+      FOLIO_REQUEST_DELAY_MS: "2000"
+      NEXUS_REQUEST_DELAY_MS: "1500"
+    volumes:
+      - ./config:/app/config
+      - ./library:/app/library
+      - ./log:/app/log

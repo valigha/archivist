@@ -1,0 +1,1125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Folio · Archivist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0c0e;
+      --surface: #14161a;
+      --surface-2: #1b1e24;
+      --fg: #ece8e1;
+      --muted: #8a8680;
+      --line: rgba(236, 232, 225, 0.12);
+      --accent: #7f9a8f;
+      --warn: #c4a574;
+      --danger: #c17b74;
+      --ok: #7f9a8f;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); }
+    body {
+      font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    button, [role="button"] { cursor: pointer; font: inherit; }
+    main { max-width: 1080px; margin: 0 auto; padding: 28px 20px 72px; }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+    .kicker {
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-size: 11px;
+      margin: 0 0 6px;
+    }
+    h1 {
+      font-family: Newsreader, Georgia, serif;
+      font-weight: 500;
+      font-size: clamp(36px, 6vw, 52px);
+      margin: 0;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .clock-wrap { text-align: right; min-width: 220px; }
+    .clock-label { color: var(--muted); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .clock {
+      font-family: Newsreader, Georgia, serif;
+      font-size: clamp(40px, 7vw, 64px);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin: 4px 0 0;
+    }
+    .clock.sleeping { color: var(--accent); }
+    .tags {
+      color: var(--muted);
+      font-size: 13px;
+      margin: 10px 0 0;
+      max-width: 46em;
+      word-break: break-word;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-top: 14px;
+    }
+    .badge::before {
+      content: "";
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 20%, transparent);
+    }
+    .badge.searching, .badge.downloading { color: var(--warn); }
+    .badge.sleeping { color: var(--accent); }
+    .badge.paused, .badge.idle { color: var(--muted); }
+    .badge.rate-limited, .badge.error { color: var(--danger); }
+    .banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin: -4px 0 18px;
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--line));
+      background: color-mix(in srgb, var(--danger) 16%, var(--surface));
+    }
+    .banner.cool {
+      border-color: color-mix(in srgb, var(--warn) 50%, var(--line));
+      background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+    }
+    .banner.hidden { display: none; }
+    .banner strong { display: block; font-weight: 600; letter-spacing: 0.01em; }
+    .banner p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .banner button {
+      flex-shrink: 0;
+      background: transparent;
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 12px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      margin: 22px 0;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+    .stat span { color: var(--muted); font-size: 12px; letter-spacing: 0.04em; }
+    .stat small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .stat small.scanning { color: var(--warn); }
+    .stat button.link { background: none; border: 0; padding: 0; margin-top: 2px; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
+    .stat button.link:hover { color: var(--fg); }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 14px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      min-height: 220px;
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .now-title {
+      font-family: Newsreader, Georgia, serif;
+      font-size: 28px;
+      margin: 0 0 8px;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+    .now-meta { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+    .bar {
+      height: 8px;
+      background: var(--surface-2);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .bar > i {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--accent);
+      border-radius: inherit;
+      transition: width 400ms ease;
+    }
+    .bar.warn > i { background: var(--warn); }
+    .pct { margin-top: 8px; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+    .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .want-scroll {
+      max-height: 240px;
+      overflow-y: auto;
+      margin-top: 10px;
+      padding-right: 4px;
+    }
+    .want-scroll::-webkit-scrollbar { width: 8px; }
+    .want-scroll::-webkit-scrollbar-thumb {
+      background: rgba(236, 232, 225, 0.22);
+      border-radius: 8px;
+    }
+    .list li {
+      display: grid;
+      grid-template-columns: 72px 1fr auto;
+      gap: 10px;
+      align-items: baseline;
+      padding: 10px 12px;
+      background: var(--surface-2);
+      border-radius: 12px;
+    }
+    .list .id { font-variant-numeric: tabular-nums; color: var(--accent); font-size: 12px; }
+    .list .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .list .when { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .empty { color: var(--muted); font-size: 14px; padding: 18px 0; }
+    .log-wrap { margin-top: 14px; }
+    .log-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .log-head h2 {
+      margin: 0;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tools button {
+      background: var(--surface);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .tools button.on, .tools button:hover { border-color: var(--accent); color: var(--accent); }
+    .log {
+      background: #101216;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      height: 240px;
+      overflow: auto;
+      padding: 12px 14px;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .log.open { height: min(70vh, 720px); }
+    .log .row { display: grid; grid-template-columns: 76px 52px 1fr; gap: 10px; }
+    .log .t { color: var(--muted); }
+    .log .INFO { color: #b7c4bc; }
+    .log .WARN { color: var(--warn); }
+    .log .ERROR { color: var(--danger); }
+    .hidden { display: none; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin: 0 0 16px;
+    }
+    .controls button {
+      background: var(--surface);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+    }
+    .controls button.primary {
+      background: var(--accent);
+      color: #0b0c0e;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .controls button:disabled { opacity: 0.45; cursor: default; }
+    .controls .hint { color: var(--muted); font-size: 13px; }
+    .search-line {
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+      font-size: 15px;
+      margin: 0 0 8px;
+      letter-spacing: -0.01em;
+    }
+    .query-card { margin-bottom: 14px; }
+    .search-line.muted { color: var(--muted); }
+    .inc-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 14px;
+    }
+    .inc-row input[type="number"] {
+      width: 72px;
+      background: var(--surface-2);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+    .inc-row button {
+      background: var(--surface);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 36px; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 6px 5px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      font-size: 13px;
+    }
+    .chip.ex { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
+    .chip .ns, .suggest .ns {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .chip button {
+      background: transparent;
+      color: var(--muted);
+      border: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .search-row { display: flex; gap: 8px; margin-top: 14px; }
+    .search-row input { flex: 1; }
+    .search-row select, .search-row input {
+      background: var(--surface-2);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+    .want-count {
+      margin: 12px 0 0;
+      font-size: 22px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+    .search-row textarea {
+      flex: 1;
+      min-width: 0;
+      min-height: 72px;
+      resize: vertical;
+      background: var(--surface-2);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+    .suggest {
+      list-style: none;
+      margin: 8px 0 0;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface-2);
+      overflow: hidden;
+      display: none;
+    }
+    .suggest.open { display: block; }
+    .suggest li {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 12px;
+      border-top: 1px solid var(--line);
+      font-size: 13px;
+    }
+    .suggest li:first-child { border-top: 0; }
+    .suggest .count { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+    .suggest button {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+    .suggest button.ex { color: var(--danger); }
+    .cycles { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .cycles th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 500;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 6px 8px;
+    }
+    .cycles td { padding: 8px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+    .cycles .bad { color: var(--danger); }
+    @media (max-width: 860px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .grid, .clock-wrap { display: block; }
+      .clock-wrap { text-align: left; margin-top: 8px; }
+      .list li { grid-template-columns: 64px 1fr; }
+      .list .when { grid-column: 2; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top">
+      <div>
+        <p class="kicker">Unraid worker</p>
+        <h1>Folio</h1>
+        <div class="badge" id="badge">starting</div>
+        <p class="tags" id="tags"></p>
+      </div>
+      <div class="clock-wrap">
+        <div class="clock-label" id="clockLabel">Elapsed</div>
+        <div class="clock" id="clock">00:00:00</div>
+      </div>
+    </div>
+
+    <aside class="banner hidden" id="banner" role="status">
+      <div>
+        <strong id="bannerTitle">Rate limited</strong>
+        <p id="bannerBody"></p>
+      </div>
+      <button type="button" id="bannerHide">Hide</button>
+    </aside>
+
+    <div class="controls">
+      <button type="button" id="btnPause">Pause</button>
+      <button type="button" class="primary" id="btnRun">Run now</button>
+      <button type="button" id="btnNewest">Stop — newest N only</button>
+      <button type="button" id="btnFull">Search all pages next</button>
+      <span class="hint" id="controlHint">Changes apply on the next cycle.</span>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span>Library (all books)</span><b id="sLibrary">0</b><small id="sLibNote"></small><button type="button" class="link" id="btnRescan">Rescan</button></div>
+      <div class="stat"><span>From Folio</span><b id="sFolio">0</b><small id="sFolioNote"></small></div>
+      <div class="stat"><span>Added</span><b id="sAdded">0</b></div>
+      <div class="stat"><span>Skipped</span><b id="sSkipped">0</b></div>
+      <div class="stat"><span>Failed</span><b id="sFailed">0</b></div>
+      <div class="stat"><span>Cycle</span><b id="sCycle">0</b></div>
+    </div>
+
+    <section class="card query-card">
+      <h2>Search query</h2>
+      <p class="now-meta">Chips are filters. Include or exclude tags from nhentai’s list. Saved instantly — click Run now to use them without restarting the container.</p>
+      <div class="chips" id="chips"></div>
+      <div class="search-row">
+        <select id="tagType" aria-label="Tag type">
+          <option value="all">All types</option>
+          <option value="tag">tag</option>
+          <option value="artist">artist</option>
+          <option value="parody">parody</option>
+          <option value="character">character</option>
+          <option value="language">language</option>
+          <option value="group">group</option>
+          <option value="category">category</option>
+        </select>
+        <input id="tagQ" type="search" autocomplete="off" placeholder="Search nhentai tags — e.g. english, unbirth, shindol"/>
+      </div>
+      <ul class="suggest" id="suggest"></ul>
+      <p class="now-meta" id="effective"></p>
+      <div class="inc-row">
+        <span class="now-meta">After a full pass, only search the first</span>
+        <input id="incPages" type="number" min="0" max="500" step="1" value="10" aria-label="Incremental pages"/>
+        <span class="now-meta">newest pages (0 = always all)</span>
+      </div>
+      <p class="now-meta" id="incStatus"></p>
+    </section>
+
+    <section class="card query-card">
+      <h2>Add a book</h2>
+      <p class="now-meta">Paste one or more nhentai links or IDs, then Add. Separate them with a comma, semicolon, or a new line. Chips and the scheduled search are not changed. The safety filter still skips illegal tags.</p>
+      <div class="search-row">
+        <textarea id="wantUrl" rows="3" autocomplete="off" placeholder="https://nhentai.net/g/123456/, https://nhentai.net/g/789012/"></textarea>
+        <button type="button" class="primary" id="btnWant">Add</button>
+      </div>
+      <p class="want-count" id="wantCount">0 books</p>
+      <p class="now-meta" id="wantProgress"></p>
+      <ul class="list want-scroll" id="wantList"></ul>
+      <p class="empty" id="wantEmpty">Nothing queued.</p>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Now</h2>
+        <p class="now-title" id="nowTitle">Starting…</p>
+        <p class="search-line muted" id="searchLine">Search page —</p>
+        <p class="now-meta" id="nowMeta"></p>
+        <div class="bar" id="bar"><i id="barFill"></i></div>
+        <p class="pct" id="pct"></p>
+      </section>
+      <section class="card">
+        <h2>Recently written</h2>
+        <ul class="list" id="recent"></ul>
+        <p class="empty" id="recentEmpty">Nothing written this session yet.</p>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Last cycles</h2>
+      <table class="cycles">
+        <thead>
+          <tr><th>#</th><th>When</th><th>Added</th><th>Skipped</th><th>Failed</th><th>Search</th><th>Ended</th></tr>
+        </thead>
+        <tbody id="cycles"></tbody>
+      </table>
+      <p class="empty" id="cyclesEmpty">No finished cycles yet.</p>
+    </section>
+
+    <section class="log-wrap">
+      <div class="log-head">
+        <h2>Log</h2>
+        <div class="tools">
+          <button type="button" data-filter="all" class="on">All</button>
+          <button type="button" data-filter="INFO">Info</button>
+          <button type="button" data-filter="WARN">Warn</button>
+          <button type="button" data-filter="ERROR">Error</button>
+          <button type="button" id="expand">Expand</button>
+          <button type="button" id="copy">Copy</button>
+        </div>
+      </div>
+      <div class="log" id="log"></div>
+    </section>
+  </main>
+  <script>
+    let data = null;
+    let filter = "all";
+    let logOpen = false;
+    let bannerHiddenAt = 0;
+    const $ = (id) => document.getElementById(id);
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+        "&": "&" + "amp;",
+        "<": "&" + "lt;",
+        ">": "&" + "gt;",
+        '"': "&" + "quot;",
+        "'": "&#39;"
+      }[c]));
+    }
+    function pad(n) { return String(n).padStart(2, "0"); }
+    function hms(ms) {
+      const s = Math.max(0, Math.floor(ms / 1000));
+      return pad(Math.floor(s / 3600)) + ":" + pad(Math.floor((s % 3600) / 60)) + ":" + pad(s % 60);
+    }
+    function ago(iso) {
+      if (!iso) return "";
+      const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+      if (s < 60) return s + "s";
+      if (s < 3600) return Math.floor(s / 60) + "m";
+      return Math.floor(s / 3600) + "h";
+    }
+    function parseLog(line) {
+      const m = String(line).match(/^\[(.+?)\]\s+(\w+)\s+(.*)$/);
+      if (!m) return { t: "", level: "INFO", msg: line };
+      return { t: m[1].slice(11, 19), level: m[2].trim(), msg: m[3] };
+    }
+
+    function paintBanner() {
+      const el = $("banner");
+      if (!data?.rateLimitAt) {
+        el.classList.add("hidden");
+        return;
+      }
+      const until = data.rateLimitUntil ? new Date(data.rateLimitUntil).getTime() : 0;
+      const active = data.rateLimited || data.state === "rate-limited" || Date.now() < until;
+      if (!active && bannerHiddenAt && new Date(data.rateLimitAt).getTime() <= bannerHiddenAt) {
+        el.classList.add("hidden");
+        return;
+      }
+      if (active) bannerHiddenAt = 0;
+      el.classList.remove("hidden");
+      el.classList.toggle("cool", !active);
+      const hits = data.rateLimitHits || 0;
+      const total = data.rateLimitCount || 0;
+      const path = data.rateLimitPath || "/search";
+      if (data.rateLimitGaveUp || data.state === "rate-limited") {
+        $("bannerTitle").textContent = "Rate limited — this cycle stopped";
+        $("bannerBody").textContent = total + " hits this session on " + path
+          + ". Delay is now " + Math.round((data.delayMs || 0) / 1000) + "s between API calls. Waiting for the next run.";
+      } else if (active) {
+        const left = Math.max(0, until - Date.now());
+        $("bannerTitle").textContent = "429 from nhentai — backing off";
+        $("bannerBody").textContent = "Waiting " + hms(left) + " then retrying " + path
+          + " · delay will become " + Math.round(((data.delayMs || 0) + 1000) / 1000) + "s · "
+          + hits + " in a row";
+      } else {
+        $("bannerTitle").textContent = "Last 429 · " + ago(data.rateLimitAt) + " ago";
+        $("bannerBody").textContent = path + " · " + total + " this session. Recovered — currently "
+          + (data.state || "running") + ".";
+      }
+    }
+
+    function tick() {
+      if (!data) return;
+      const clock = $("clock");
+      const label = $("clockLabel");
+      if (data.paused || data.state === "paused") {
+        label.textContent = "Paused";
+        clock.textContent = "hold";
+        clock.className = "clock";
+      } else if (data.state === "sleeping" && data.sleepUntil) {
+        const left = new Date(data.sleepUntil).getTime() - Date.now();
+        label.textContent = "Next run in";
+        clock.textContent = hms(left);
+        clock.className = "clock sleeping";
+      } else {
+        const start = data.cycleStartedAt || data.startedAt;
+        label.textContent = data.state === "stopped" ? "Stopped" : "This cycle";
+        clock.textContent = hms(Date.now() - new Date(start).getTime());
+        clock.className = "clock";
+      }
+      paintBanner();
+    }
+
+    function paintSearchLine() {
+      const el = $("searchLine");
+      const page = data.searchPage || 0;
+      const pages = data.searchPages || 0;
+      const mode = data.searchMode === "incremental"
+        ? ("newest " + (data.searchPageCap || data.incrementalPages || 0))
+        : "full pass";
+      if (!pages && !page) {
+        el.textContent = data.nextCycleFull
+          ? "Next search: all pages"
+          : ("Next search: newest " + (data.incrementalPages || 0) + " pages");
+        el.className = "search-line muted";
+        return;
+      }
+      el.textContent = "Search page " + page + " / " + pages + " · " + mode;
+      el.className = "search-line";
+    }
+
+    function paintNow() {
+      const title = $("nowTitle");
+      const meta = $("nowMeta");
+      const bar = $("bar");
+      const fill = $("barFill");
+      const pct = $("pct");
+      const st = data.state;
+      paintSearchLine();
+      if (data.libraryScanning && st !== "downloading") {
+        const found = data.libraryScanFound || 0;
+        title.textContent = "Scanning the library…";
+        meta.textContent = (found ? (found.toLocaleString() + " books counted so far · ") : "")
+          + "the page is working — a large library can take a few minutes the first time";
+        fill.style.width = "35%";
+        bar.className = "bar warn";
+        pct.textContent = "";
+        return;
+      }
+      if (st === "paused" || data.paused && st !== "downloading") {
+        title.textContent = "Paused";
+        meta.textContent = "Current gallery will finish. Click Run now when you want the next cycle.";
+        fill.style.width = "0";
+        bar.className = "bar";
+        pct.textContent = "";
+        if (st !== "downloading") return;
+      }
+      if (st === "idle") {
+        title.textContent = "Waiting for a query";
+        meta.textContent = "Add tag chips below, then Run now.";
+        fill.style.width = "0";
+        bar.className = "bar";
+        pct.textContent = "";
+        return;
+      }
+      if (st === "sleeping") {
+        title.textContent = "Sleeping until next search";
+        meta.textContent = data.nextCycleFull
+          ? "Next cycle will walk all pages (chips changed or full pass requested)."
+          : ("Next cycle only searches the newest " + (data.incrementalPages || 0) + " pages.");
+        fill.style.width = "100%";
+        bar.className = "bar";
+        pct.textContent = data.sleepUntil ? ("Wakes " + data.sleepUntil.replace("T", " ").slice(0, 19) + " UTC") : "";
+        return;
+      }
+      if (st === "downloading" || st === "dry-run") {
+        title.textContent = data.currentTitle || ("#" + data.currentId);
+        const done = data.downloadDone || 0;
+        const total = data.downloadTotal || 0;
+        meta.textContent = total
+          ? ("Downloading #" + data.currentId + " · image " + done + " / " + total)
+          : ("Fetching #" + data.currentId);
+        const p = total ? Math.round((done / total) * 100) : 8;
+        fill.style.width = p + "%";
+        bar.className = "bar warn";
+        pct.textContent = total ? (p + "% of this gallery") : "Starting download…";
+        return;
+      }
+      if (st === "searching") {
+        const page = data.searchPage || 0;
+        const pages = data.searchPages || 0;
+        title.textContent = pages ? ("Search page " + page + " / " + pages) : "Searching";
+        meta.textContent = (data.searchTotal ? (data.searchTotal.toLocaleString() + " galleries · ") : "")
+          + (data.searchMode === "incremental" ? "newest-only · " : "full pass · ")
+          + "streak " + (data.streak || 0)
+          + (data.catchUpStreak ? (" / " + data.catchUpStreak) : "")
+          + " already handled";
+        const denom = data.searchPageCap || pages;
+        const p = denom ? Math.round((page / denom) * 100) : 0;
+        fill.style.width = Math.max(2, p) + "%";
+        bar.className = "bar warn";
+        pct.textContent = data.searchMode === "incremental"
+          ? ("Newest-only cap " + (data.searchPageCap || 0) + " pages")
+          : (pages ? (p + "% of this cycle's search") : data.message || "");
+        return;
+      }
+      title.textContent = data.message || st;
+      meta.textContent = data.mode === "server" ? "Server mode" : "Client mode";
+      fill.style.width = st === "starting" ? "12%" : "0";
+      bar.className = "bar";
+      pct.textContent = "";
+    }
+
+    function paintRecent() {
+      const items = (data.recent || []).filter((e) => e.type === "wrote");
+      const ul = $("recent");
+      const empty = $("recentEmpty");
+      ul.innerHTML = items.slice(0, 8).map((e) =>
+        "<li><span class=\"id\">#" + esc(e.id) + "</span><span class=\"name\" title=\"" + esc(e.title) + "\">"
+        + esc(e.title) + "</span><span class=\"when\">" + esc(ago(e.at))
+        + (e.pages ? " · " + e.pages + "p" : "") + "</span></li>"
+      ).join("");
+      empty.classList.toggle("hidden", items.length > 0);
+    }
+
+    function paintLog() {
+      const rows = (data.log || []).map(parseLog).filter((r) => filter === "all" || r.level === filter);
+      const el = $("log");
+      const stick = autoBottom(el);
+      el.innerHTML = rows.map((r) =>
+        "<div class=\"row\"><span class=\"t\">" + esc(r.t) + "</span><span class=\"" + esc(r.level) + "\">"
+        + esc(r.level) + "</span><span>" + esc(r.msg) + "</span></div>"
+      ).join("") || "<div class=\"empty\">No log lines yet.</div>";
+      if (stick) el.scrollTop = el.scrollHeight;
+    }
+
+    function autoBottom(el) {
+      return el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    }
+
+    function parseTerm(raw) {
+      const t = String(raw || "").trim();
+      const exclude = t.startsWith("-");
+      const body = exclude ? t.slice(1) : t;
+      const m = body.match(/^([a-z]+):"?([^"]+)"?$/i);
+      if (m) return { raw: t, exclude, type: m[1], name: m[2] };
+      return { raw: t, exclude, type: "tag", name: body };
+    }
+    function formatTerm(type, name, exclude) {
+      const n = String(name).trim();
+      const body = type + ":\"" + n + "\"";
+      return exclude ? "-" + body : body;
+    }
+    async function postJSON(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || res.status);
+      data = json;
+      paint();
+      return json;
+    }
+    async function saveTags(next) {
+      $("controlHint").textContent = "Saving…";
+      try {
+        await postJSON("/api/config", { tags: next });
+        $("controlHint").textContent = "Saved. Applies on the next cycle — or click Run now.";
+      } catch (err) {
+        $("controlHint").textContent = err.message || "Save failed";
+      }
+    }
+    function paintChips() {
+      const list = data.tagList || [];
+      const el = $("chips");
+      if (!list.length) {
+        el.innerHTML = "<span class=\"empty\">No chips yet. Search below and Include / Exclude.</span>";
+      } else {
+        el.innerHTML = list.map((raw, i) => {
+          const t = parseTerm(raw);
+          return "<span class=\"chip" + (t.exclude ? " ex" : "") + "\"><span class=\"ns\">"
+            + (t.exclude ? "not " : "") + esc(t.type) + "</span><span>"
+            + esc(t.name) + "</span><button type=\"button\" data-rm=\"" + i + "\" aria-label=\"Remove\">×</button></span>";
+        }).join("");
+        el.querySelectorAll("[data-rm]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const next = list.slice();
+            next.splice(Number(btn.getAttribute("data-rm")), 1);
+            saveTags(next);
+          });
+        });
+      }
+      $("effective").textContent = data.tags
+        ? ("Effective search: " + data.tags)
+        : "Safety filter still appends illegal-tag excludes when enabled.";
+      paintInc();
+    }
+    function paintInc() {
+      const input = $("incPages");
+      if (document.activeElement !== input) {
+        input.value = String(data.incrementalPages ?? 10);
+      }
+      if (data.nextCycleFull) {
+        $("incStatus").textContent = data.lastFullAt
+          ? "Next cycle: all pages (chips changed or full search requested)."
+          : "Next cycle: all pages — no full pass recorded for these chips yet.";
+      } else {
+        $("incStatus").textContent = "Next cycle: newest " + (data.incrementalPages || 0)
+          + " pages only. Last full pass " + (data.lastFullAt ? ago(data.lastFullAt) + " ago" : "recorded")
+          + ". API delay " + Math.round((data.delayMs || 0) / 1000) + "s.";
+      }
+    }
+    function paintCycles() {
+      const rows = data.cycles || [];
+      $("cyclesEmpty").classList.toggle("hidden", rows.length > 0);
+      $("cycles").innerHTML = rows.map((c) => {
+        const when = (c.ended || c.at || "").replace("T", " ").slice(0, 16);
+        const search = c.pages ? ((c.page || 0) + "/" + c.pages) : "—";
+        const reason = c.rateLimited ? "429" : (c.reason || "");
+        return "<tr><td>" + esc(c.n) + "</td><td>" + esc(when)
+          + "</td><td>" + esc(c.added) + "</td><td>" + esc(c.skipped) + "</td><td>"
+          + esc(c.failed) + "</td><td>" + esc(search) + "</td><td class=\""
+          + (c.rateLimited ? "bad" : "") + "\">" + esc(reason) + "</td></tr>";
+      }).join("");
+    }
+    function paintControls() {
+      const running = data.state === "searching" || data.state === "downloading";
+      $("btnPause").disabled = Boolean(data.paused) || data.state === "paused" || data.state === "idle";
+      $("btnRun").disabled = running && !data.paused;
+      if (data.paused || data.state === "paused") $("btnRun").disabled = false;
+    }
+    let suggestTimer = 0;
+    async function searchTags() {
+      const q = $("tagQ").value.trim();
+      const box = $("suggest");
+      if (q.length < 2) { box.classList.remove("open"); box.innerHTML = ""; return; }
+      try {
+        const type = $("tagType").value;
+        const url = "/api/tags?q=" + encodeURIComponent(q) + "&type=" + encodeURIComponent(type);
+        const res = await fetch(url, { cache: "no-store" });
+        const json = await res.json();
+        const rows = json.result || [];
+        if (!rows.length) {
+          box.innerHTML = "<li><span>No tags match</span></li>";
+          box.classList.add("open");
+          return;
+        }
+        box.innerHTML = rows.map((t) =>
+          "<li><span><span class=\"ns\">" + esc(t.type) + "</span> " + esc(t.name)
+          + "</span><span class=\"count\">" + Number(t.count || 0).toLocaleString()
+          + "</span><button type=\"button\" data-inc=\"" + esc(t.type) + "\" data-name=\""
+          + esc(t.name) + "\">Include</button><button type=\"button\" class=\"ex\" data-ex=\""
+          + esc(t.type) + "\" data-name=\"" + esc(t.name) + "\">Exclude</button></li>"
+        ).join("");
+        box.classList.add("open");
+        box.querySelectorAll("button").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const type = btn.getAttribute("data-inc") || btn.getAttribute("data-ex");
+            const name = btn.getAttribute("data-name");
+            const exclude = btn.hasAttribute("data-ex");
+            const term = formatTerm(type, name, exclude);
+            const next = (data.tagList || []).filter((x) => x !== term && x !== formatTerm(type, name, !exclude));
+            next.push(term);
+            saveTags(next);
+            $("tagQ").value = "";
+            box.classList.remove("open");
+          });
+        });
+      } catch {
+        box.innerHTML = "<li><span>Tag search failed (maybe rate limited)</span></li>";
+        box.classList.add("open");
+      }
+    }
+
+    function paint() {
+      if (!data) return;
+      try {
+        $("badge").textContent = data.state || "unknown";
+        $("badge").className = "badge " + (data.state || "");
+        $("tags").textContent = (data.tagList && data.tagList.length)
+          ? (data.tagList.length + " chip" + (data.tagList.length === 1 ? "" : "s"))
+          : "No query yet";
+        const lib = data.libraryTotal || 0;
+        const mine = data.libraryCount || 0;
+        const scanning = Boolean(data.libraryScanning);
+        const note = $("sLibNote");
+        $("sLibrary").textContent = (scanning && !lib) ? "…" : lib.toLocaleString();
+        $("sFolio").textContent = (scanning && !mine) ? "…" : mine.toLocaleString();
+        $("sFolioNote").textContent = Math.max(0, lib - mine) ? (Math.max(0, lib - mine).toLocaleString() + " from other tools") : "";
+        note.className = scanning ? "scanning" : "";
+        if (scanning) note.textContent = "scanning…" + (data.libraryScanFound ? (" " + data.libraryScanFound.toLocaleString() + " so far") : "");
+        else if (data.libraryScannedAt) {
+          const mins = Math.max(0, Math.round((Date.now() - Date.parse(data.libraryScannedAt)) / 60000));
+          note.textContent = "checked " + (mins < 1 ? "just now" : mins + "m ago");
+        } else note.textContent = "";
+        $("btnRescan").disabled = scanning;
+        $("sAdded").textContent = String(data.addedThisCycle ?? data.downloaded ?? 0);
+        $("sSkipped").textContent = String(data.skippedThisCycle ?? data.skipped ?? 0);
+        $("sFailed").textContent = String(data.failedThisCycle ?? data.failed ?? 0);
+        $("sCycle").textContent = String(data.cycle || 0);
+        paintNow();
+        paintRecent();
+        paintLog();
+        paintChips();
+        paintCycles();
+        paintWant();
+        paintWantCount();
+        paintControls();
+        tick();
+      } catch (err) {
+        console.error(err);
+        $("badge").textContent = "ui-error";
+        $("badge").className = "badge error";
+      }
+    }
+
+    function paintWant() {
+      const queued = data.wantQueue || [];
+      const recent = data.wantRecent || [];
+      const ul = $("wantList");
+      const empty = $("wantEmpty");
+      const rows = [];
+      for (const id of queued) {
+        rows.push("<li><span class=\"id\">#" + esc(id) + "</span><span class=\"name\">Queued — chips ignored</span></li>");
+      }
+      for (const e of recent.slice(0, 6)) {
+        const label = e.result === "wrote" ? (e.title || "Saved")
+          : e.result === "have" ? "Already in library"
+          : e.result === "blacklisted" ? "On the blacklist"
+          : e.result === "skipped" ? "Skipped (safety filter)"
+          : e.result === "failed" ? (e.title || "Failed")
+          : esc(e.result || "");
+        rows.push("<li><span class=\"id\">#" + esc(e.id) + "</span><span class=\"name\">" + esc(label) + "</span><span class=\"when\">" + esc(ago(e.at)) + "</span></li>");
+      }
+      ul.innerHTML = rows.join("");
+      empty.classList.toggle("hidden", rows.length > 0);
+    }
+
+    function countGalleryRefs(text) {
+      const seen = new Set();
+      const raw = String(text || "");
+      for (const m of raw.matchAll(/(?:https?:\/\/)?(?:www\.)?nhentai\.net\/g\/(\d+)/gi)) seen.add(m[1]);
+      const stripped = raw.replace(/https?:\/\/[^\s,;]+/gi, " ");
+      for (const part of stripped.split(/[\s,;]+/)) {
+        if (/^\d+$/.test(part) && Number(part) > 0) seen.add(String(Number(part)));
+      }
+      return seen.size;
+    }
+
+    function paintWantCount() {
+      const typed = countGalleryRefs($("wantUrl").value);
+      const batch = data.wantBatch || { total: 0, done: 0, left: 0 };
+      const left = (data.wantQueue || []).length;
+      if (typed > 0) {
+        $("wantCount").textContent = typed + (typed === 1 ? " book" : " books") + " in this add";
+        $("btnWant").textContent = "Add " + typed;
+      } else {
+        $("wantCount").textContent = batch.total
+          ? (batch.done + " of " + batch.total)
+          : "0 books";
+        $("btnWant").textContent = "Add";
+      }
+      if (!batch.total) {
+        $("wantProgress").textContent = "";
+        return;
+      }
+      const noun = batch.total === 1 ? "book" : "books";
+      $("wantProgress").textContent = left
+        ? ("Last add: " + batch.done + " of " + batch.total + " " + noun + " · " + left + " still queued")
+        : ("Last add: " + batch.total + " " + noun);
+    }
+
+    async function poll() {
+      try {
+        const res = await fetch("/api/status", { cache: "no-store" });
+        data = await res.json();
+        paint();
+      } catch {
+        $("badge").textContent = "offline";
+        $("badge").className = "badge error";
+      }
+    }
+
+    document.querySelectorAll("[data-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        filter = btn.getAttribute("data-filter");
+        document.querySelectorAll("[data-filter]").forEach((b) => b.classList.toggle("on", b === btn));
+        if (data) paintLog();
+      });
+    });
+    $("expand").addEventListener("click", () => {
+      logOpen = !logOpen;
+      $("log").classList.toggle("open", logOpen);
+      $("expand").textContent = logOpen ? "Collapse" : "Expand";
+    });
+    $("copy").addEventListener("click", async () => {
+      const text = (data?.log || []).join("\n");
+      try { await navigator.clipboard.writeText(text); $("copy").textContent = "Copied"; }
+      catch { $("copy").textContent = "Failed"; }
+      setTimeout(() => { $("copy").textContent = "Copy"; }, 1200);
+    });
+    $("bannerHide").addEventListener("click", () => {
+      bannerHiddenAt = Date.now();
+      $("banner").classList.add("hidden");
+    });
+    $("btnPause").addEventListener("click", () => {
+      $("controlHint").textContent = "Pausing after this gallery…";
+      postJSON("/api/control", { action: "pause" }).catch((e) => {
+        $("controlHint").textContent = e.message;
+      });
+    });
+    $("btnRun").addEventListener("click", () => {
+      $("controlHint").textContent = "Starting…";
+      postJSON("/api/control", { action: "run" }).catch((e) => {
+        $("controlHint").textContent = e.message;
+      });
+    });
+    $("btnRescan").addEventListener("click", () => {
+      postJSON("/api/rescan", {}).catch((e) => {
+        $("controlHint").textContent = e.message || "Rescan failed";
+      });
+    });
+    $("btnFull").addEventListener("click", () => {
+      $("controlHint").textContent = "Next cycle will search all pages.";
+      postJSON("/api/control", { action: "full" }).catch((e) => {
+        $("controlHint").textContent = e.message;
+      });
+    });
+    $("btnNewest").addEventListener("click", () => {
+      $("controlHint").textContent = "Stopping this full walk — next cycle is newest N only (saved across restarts).";
+      postJSON("/api/control", { action: "newest" }).catch((e) => {
+        $("controlHint").textContent = e.message;
+      });
+    });
+    let incTimer = 0;
+    $("incPages").addEventListener("change", () => {
+      clearTimeout(incTimer);
+      const n = Number($("incPages").value);
+      postJSON("/api/config", { incrementalPages: n }).then(() => {
+        $("controlHint").textContent = "Newest-page cap saved.";
+      }).catch((e) => { $("controlHint").textContent = e.message; });
+    });
+    $("incPages").addEventListener("input", () => {
+      clearTimeout(incTimer);
+      incTimer = setTimeout(() => $("incPages").dispatchEvent(new Event("change")), 600);
+    });
+    $("btnWant").addEventListener("click", submitWant);
+    $("wantUrl").addEventListener("input", countWant);
+    function countWant() {
+      const n = countGalleryRefs($("wantUrl").value);
+      $("wantCount").textContent = n + (n === 1 ? " book" : " books") + (n ? " in this add" : "");
+      $("btnWant").textContent = n ? ("Add " + n) : "Add";
+    }
+    $("wantUrl").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        submitWant();
+      }
+    });
+    async function submitWant() {
+      const text = $("wantUrl").value.trim();
+      if (!text) return;
+      $("controlHint").textContent = "Queuing…";
+      try {
+        const out = await postJSON("/api/want", { text });
+        $("wantUrl").value = "";
+        const n = out.total || (out.queued || []).length;
+        const accepted = out.accepted ?? n;
+        countWant();
+        $("controlHint").textContent = n
+          ? ("Added " + n + (n === 1 ? " book" : " books")
+            + (accepted !== n ? " (" + accepted + " new)" : "")
+            + ".")
+          : "Nothing to queue.";
+      } catch (e) {
+        $("controlHint").textContent = e.message;
+      }
+    }
+    $("tagQ").addEventListener("input", () => {
+      clearTimeout(suggestTimer);
+      suggestTimer = setTimeout(searchTags, 350);
+    });
+    $("tagType").addEventListener("change", () => {
+      if ($("tagQ").value.trim().length >= 2) searchTags();
+    });
+    document.addEventListener("click", (e) => {
+      if (!$("suggest").contains(e.target) && e.target !== $("tagQ")) {
+        $("suggest").classList.remove("open");
+      }
+    });
+
+    poll();
+    setInterval(poll, 2000);
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>
