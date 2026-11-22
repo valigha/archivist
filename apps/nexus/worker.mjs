@@ -81,6 +81,9 @@ const status = {
   message: "",
   running: false,
   nextDownloadAt: null,
+  pauseUntil: null, // set while waiting to retry after an error
+  pauseMs: 0,
+  pauseReason: "",
   downloadDelaySec: 180,
   login: { loggedIn: false, expired: false, user: "", since: null },
   tagsInput: "",
@@ -201,6 +204,20 @@ function xml(s) {
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Wait before trying again after an error, and publish it so the dashboard can show a countdown.
+async function retryPause(ms, reason, sleeper = wait) {
+  status.pauseUntil = new Date(Date.now() + ms).toISOString();
+  status.pauseMs = ms;
+  status.pauseReason = reason;
+  try {
+    await sleeper(ms);
+  } finally {
+    status.pauseUntil = null;
+    status.pauseMs = 0;
+    status.pauseReason = "";
+  }
+}
 
 const NET_HINTS = {
   ENOTFOUND: "DNS could not resolve the host. Check Pi-hole/AdGuard/router blocking, or give the container a DNS server (Extra Parameters: --dns 1.1.1.1).",
@@ -475,7 +492,7 @@ async function jarFetch(jar, url, { method = "GET", body, referer } = {}) {
         if (attempt < 3 && safe && isTransient(err)) {
           const pause = 2000 * 2 ** attempt;
           log("warn", `${describeError(err)} (${cur}) - retrying in ${pause / 1000}s`);
-          await wait(pause);
+          await retryPause(pause, "the site reset the connection");
           continue;
         }
         throw new Error(`${describeError(err)} (${cur})`);
@@ -595,7 +612,7 @@ async function http(url, { referer } = {}) {
       if (isTransient(err) && i < 4) {
         const pause = Math.min(60_000, 3000 * 2 ** i);
         log("warn", `${last} (${url}) - retrying in ${Math.round(pause / 1000)}s`);
-        await wait(pause);
+        await retryPause(pause, last);
         continue;
       }
       throw new Error(`${last} (${url})`);
@@ -604,7 +621,7 @@ async function http(url, { referer } = {}) {
     if (res.status === 429 || res.status === 503 || res.status === 502) {
       const pause = Math.min(120_000, 4000 * 2 ** i);
       log("warn", `${res.status} ${url} — waiting ${Math.round(pause / 1000)}s`);
-      await wait(pause);
+      await retryPause(pause, `the site answered ${res.status} (too busy)`);
       last = String(res.status);
       continue;
     }
@@ -868,7 +885,7 @@ async function httpFile(url, dest, { referer } = {}) {
         const silent = err.name === "TimeoutError";
         const pause = silent ? quietPause() : Math.min(60_000, 3000 * 2 ** (fails - 1));
         log("warn", `${last} (${url}) - trying again in ${fmtDuration(pause)}${silent ? " (the site throttles right after a failed attempt, so this waits longer)" : ""}`);
-        await nap(pause);
+        await retryPause(pause, silent ? "the site went quiet and is throttling" : last, nap);
         continue;
       }
       throw new Error(`${last} (${url})`);
@@ -879,7 +896,7 @@ async function httpFile(url, dest, { referer } = {}) {
       if (fail(String(res.status))) throw new Error(`gave up ${url} (${last})`);
       const pause = Math.min(120_000, 4000 * 2 ** (fails - 1));
       log("warn", `${res.status} ${url} - waiting ${Math.round(pause / 1000)}s`);
-      await nap(pause);
+      await retryPause(pause, `the site answered ${res.status} (too busy)`, nap);
       continue;
     }
     if (res.status === 401 || res.status === 403) {
@@ -974,7 +991,7 @@ async function httpFile(url, dest, { referer } = {}) {
       status.downloadDone = got;
       const pause = silent ? quietPause() : Math.min(60_000, 3000 * 2 ** Math.max(0, fails - 1));
       log("warn", `download interrupted at ${MB(size)}${status.downloadTotal ? ` of ${MB(status.downloadTotal)}` : ""} (${reason}) - ${got ? "resuming" : "restarting"} in ${fmtDuration(pause)}${silent ? " (the site throttles right after a failed attempt, so this waits longer)" : ""}`);
-      await nap(pause);
+      await retryPause(pause, silent ? "the download stalled and the site is throttling" : reason, nap);
       continue;
     }
 
