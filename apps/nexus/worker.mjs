@@ -34,6 +34,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 loadDotenv(process.env.ENV_FILE || "/app/config/.env");
 
+// Read a number from the environment; unlike "Number(x) || fallback", an explicit 0 is kept.
+function envNum(name, fallback) {
+  const raw = process.env[name];
+  if (raw == null || String(raw).trim() === "") return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 const cfg = {
   library: process.env.LIBRARY_PATH || "/app/library/",
   split: Math.max(0, Number(process.env.LIBRARY_SPLIT) || 0),
@@ -41,8 +49,9 @@ const cfg = {
   dont: process.env.DONTDOWNLOADME_FILEPATH || "/app/config/dontdownloadme.txt",
   sleep: Math.max(0, Number(process.env.SLEEP_INTERVAL) || 3600),
   delay: Math.max(200, Number(process.env.REQUEST_DELAY_MS) || 1500),
-  streakCap: Math.max(0, Number(process.env.CATCH_UP_STREAK) || 40),
-  maxPerCycle: Math.max(0, Number(process.env.MAX_PER_CYCLE) || 10),
+  // 0 = off. Both default to off so a cycle reads every page up to the page limit.
+  streakCap: Math.max(0, envNum("CATCH_UP_STREAK", 0)),
+  maxPerCycle: Math.max(0, envNum("MAX_PER_CYCLE", 0)),
   // File names start with this prefix so a library shared with another tool
   // (whose names start with a bare number) never mixes up the two sites' ids.
   prefix: String(process.env.FILE_PREFIX ?? "HN").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 8),
