@@ -6,10 +6,15 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.1.3` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.1.3` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.1.4` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.1.4` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.1.4
+
+- Folio: a dropped or timed-out connection while searching is now retried (up to 4 times, waiting longer each time) instead of ending the cycle with a bare "fetch failed". The log now says the real reason, such as ETIMEDOUT or ECONNRESET
+- Unraid template: added the Folio settings that the separate Folio container had and this one did not (`FOLIO_API_KEY`, `FOLIO_USER_AGENT`, `FOLIO_INCREMENTAL_PAGES`, `FOLIO_SAFETY_FILTER`, `FOLIO_FILENAME_TITLE_TYPE`, `FOLIO_DOWNLOAD_WORKERS`, `FOLIO_CIRCUMVENT_LOAD_BALANCER`)
 
 ## 0.1.3
 
