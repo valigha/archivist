@@ -566,6 +566,14 @@ async function bumpDelay() {
   await saveLive();
 }
 
+// "fetch failed" hides the real reason in err.cause; show it (ETIMEDOUT, ECONNRESET, ...).
+function describeNetError(err) {
+  const c = err?.cause;
+  const code = c?.code || err?.code || "";
+  const msg = c?.message || err?.message || String(err);
+  return code && !msg.includes(code) ? `${msg} (${code})` : msg;
+}
+
 async function api(path) {
   const headers = {
     "User-Agent": UA,
@@ -573,9 +581,24 @@ async function api(path) {
   };
   if (cfg.API_KEY) headers.Authorization = `Key ${cfg.API_KEY}`;
   if (cfg.COOKIE) headers.Cookie = cfg.COOKIE;
+  let netFails = 0;
   for (let i = 0; i < 8; i++) {
     await throttleApi();
-    const res = await fetch(`${API}${path}`, { headers });
+    let res;
+    try {
+      res = await fetch(`${API}${path}`, { headers });
+    } catch (err) {
+      // A dropped or timed-out connection is retried instead of ending the whole cycle.
+      const why = describeNetError(err);
+      if (netFails < 4 && !shuttingDown && !abortCycle) {
+        netFails += 1;
+        const wait = Math.min(60_000, 5000 * 2 ** (netFails - 1));
+        log("warn", `${why} on ${path} — trying again in ${Math.round(wait / 1000)}s (${netFails}/4)`);
+        await sleep(wait);
+        continue;
+      }
+      throw new Error(`${why} (${path})`);
+    }
     if (res.status === 429) {
       rateLimitHits += 1;
       const retryAfter = Number(res.headers.get("retry-after"));
