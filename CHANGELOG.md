@@ -6,10 +6,15 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.1.1` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.1.1` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.1.2` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.1.2` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.1.2
+
+- Folio no longer stops a search early. Before, it ended the cycle after 50 already-in-library galleries in a row, even when the page limit was larger (a 10-page limit could stop on page 3). Now it reads every page up to the limit, and all pages when the limit is 0
+- To get the old early stop back, set `FOLIO_CATCH_UP_STREAK` to a number such as 50
 
 ## 0.1.1
 
