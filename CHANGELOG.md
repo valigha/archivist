@@ -6,10 +6,14 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.1.2` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.1.2` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.1.3` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.1.3` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.1.3
+
+- Both tabs show the log newest line first, so the latest activity is at the top of the log box and you no longer scroll down after switching tabs. If you scroll down to read something, new lines do not push it out of view
 
 ## 0.1.2
 

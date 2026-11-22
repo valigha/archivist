@@ -766,13 +766,15 @@
     }
 
     function paintLog() {
-      const rows = (data.log || []).map(parseLog).filter((r) => filter === "all" || r.level === filter);
+      // Newest line first, so the latest activity is always at the top.
+      const rows = (data.log || []).map(parseLog).filter((r) => filter === "all" || r.level === filter).reverse();
       const el = $("log");
-      const stick = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+      const prevTop = el.scrollTop, prevH = el.scrollHeight;
       el.innerHTML = rows.map((r) =>
         '<div class="row"><span class="t">' + esc(r.t) + '</span><span class="' + esc(r.level) + '">' + esc(r.level) + "</span><span>" + esc(r.msg) + "</span></div>"
       ).join("") || '<div class="empty">No log lines yet.</div>';
-      if (stick) el.scrollTop = el.scrollHeight;
+      // Stay at the top when already there; otherwise keep what you are reading in place.
+      el.scrollTop = prevTop < 48 ? 0 : prevTop + (el.scrollHeight - prevH);
     }
 
     async function saveChips(next) {
