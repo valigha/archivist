@@ -6,10 +6,15 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.1.4` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.1.4` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.1.5` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.1.5` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.1.5
+
+- Nexus now works like Folio: a cycle reads every page up to the page limit (all pages when the limit is 0) and downloads every new book it finds. Before, it stopped after 10 new books (`MAX_PER_CYCLE`) or after 40 already-in-library galleries in a row (`CATCH_UP_STREAK`)
+- Both limits are now off by default. Set `NEXUS_MAX_PER_CYCLE` or `NEXUS_CATCH_UP_STREAK` to a number to bring either back; an explicit 0 now means off (before, 0 was ignored and the old default came back)
 
 ## 0.1.4
 
