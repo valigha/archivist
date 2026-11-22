@@ -666,7 +666,11 @@
     function tick() {
       if (!data) return;
       const clock = $("clock"), label = $("clockLabel");
-      if (data.state === "waiting" && data.nextDownloadAt) {
+      if (data.pauseUntil) {
+        label.textContent = "Trying again in";
+        clock.textContent = hms(new Date(data.pauseUntil).getTime() - Date.now());
+        clock.className = "clock sleeping";
+      } else if (data.state === "waiting" && data.nextDownloadAt) {
         label.textContent = "Next download in";
         clock.textContent = hms(new Date(data.nextDownloadAt).getTime() - Date.now());
         clock.className = "clock sleeping";
@@ -705,7 +709,16 @@
       bar.className = "bar";
       pct.textContent = "";
       fill.style.width = "0";
-      if (st === "downloading" || st === "dry-run") {
+      if (data.pauseUntil) {
+        const left = new Date(data.pauseUntil).getTime() - Date.now();
+        const full = data.pauseMs || 0;
+        title.textContent = "Paused — will retry" + (data.currentId ? " #" + data.currentId : "");
+        const saved = data.downloadDone ? " · " + mb(data.downloadDone) + (data.downloadTotal ? " of " + mb(data.downloadTotal) : "") + " saved" : "";
+        meta.textContent = "Trying again in " + ms2(left) + " · " + (data.pauseReason || "an error happened") + saved;
+        fill.style.width = full ? Math.max(2, Math.min(100, Math.round((1 - left / full) * 100))) + "%" : "0";
+        bar.className = "bar warn";
+        pct.textContent = "Waiting before the next attempt";
+      } else if (st === "downloading" || st === "dry-run") {
         title.textContent = data.currentTitle ? data.currentTitle : "#" + data.currentId;
         const done = data.downloadDone || 0, total = data.downloadTotal || 0;
         meta.textContent = total ? "Downloading #" + data.currentId + " · " + mb(done) + " / " + mb(total) : "Fetching #" + data.currentId;

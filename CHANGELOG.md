@@ -6,10 +6,15 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.1.0` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.1.0` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.1.1` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.1.1` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.1.1
+
+- Nexus: when it has to wait before retrying after an error (the site going quiet and throttling, a dropped or reset connection, or a "too busy" answer), the big clock now says "Trying again in …" and counts down, and the Now card says why it is waiting and how much of the book is already saved
+- Waiting between downloads still shows "Next download in …" as before
 
 ## 0.1.0
 
