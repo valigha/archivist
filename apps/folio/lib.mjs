@@ -226,7 +226,7 @@ export function loadConfigFrom(env) {
     CIRCUMVENT_LOAD_BALANCER: bool(env.CIRCUMVENT_LOAD_BALANCER, true),
     CLEANUP_TEMPORARY_FILES: bool(env.CLEANUP_TEMPORARY_FILES, true),
     SAFETY_FILTER: bool(env.SAFETY_FILTER, true),
-    CATCH_UP_STREAK: Math.max(0, num(env.CATCH_UP_STREAK, 50)),
+    CATCH_UP_STREAK: Math.max(0, num(env.CATCH_UP_STREAK, 0)),
     MAX_PER_CYCLE: Math.max(0, num(env.MAX_PER_CYCLE, 0)),
     SEARCH_SORT: env.SEARCH_SORT || "date",
     DRY_RUN: bool(env.DRY_RUN, false),
