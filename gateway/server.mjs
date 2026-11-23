@@ -56,7 +56,9 @@ function start(key) {
   const app = APPS[key];
   let child;
   try {
-    child = spawn(process.execPath, [join(ROOT, "apps", key, "worker.mjs")], {
+    // Node refuses a reply whose headers are over 16 KB (UND_ERR_HEADERS_OVERFLOW). Some site
+    // replies are bigger than that, so both apps are allowed far larger headers.
+    child = spawn(process.execPath, ["--max-http-header-size=262144", join(ROOT, "apps", key, "worker.mjs")], {
       env: envFor(key),
       cwd: join(ROOT, "apps", key),
       stdio: ["ignore", "pipe", "pipe"],
