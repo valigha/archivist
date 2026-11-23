@@ -90,6 +90,10 @@ const status = {
   message: "",
   running: false,
   nextDownloadAt: null,
+  pauseRequested: false, // Pause pressed: finishing the current book
+  holding: false, // paused and waiting for Resume
+  resume: null, // { query, page } where the search was when it last stopped
+  startPageOnce: 0, // one-off start page you typed
   pauseUntil: null, // set while waiting to retry after an error
   pauseMs: 0,
   pauseReason: "",
@@ -169,6 +173,9 @@ let queueArmed = false;
 let stopCtl = new AbortController(); // aborted by Stop so a running download ends at once
 let stopEpoch = 0; // bumped by Stop so waits for the delay can be cancelled
 let downloadDelaySec = 180;
+let softPause = false; // Pause (hold) as opposed to Stop
+let resume = null; // { query, page }
+let startPageOnce = 0;
 let lastDownloadEnd = 0;
 let loginBusy = false;
 let runNow = false;
@@ -305,6 +312,9 @@ function fmtDuration(ms) {
 function sync() {
   status.paused = paused;
   status.running = !paused;
+  status.pauseRequested = softPause;
+  status.resume = resume;
+  status.startPageOnce = startPageOnce;
   status.downloadDelaySec = downloadDelaySec;
   status.login = { loggedIn: session.loggedIn, expired: session.expired, user: session.user, since: session.at };
   status.tagsInput = liveTags;
@@ -321,7 +331,7 @@ async function saveLive() {
   sync();
   try {
     await mkdir(dirname(livePath), { recursive: true });
-    await writeFile(livePath, JSON.stringify({ chips: liveChips, pageLimit, wantQueue, downloadDelaySec }, null, 2) + "\n");
+    await writeFile(livePath, JSON.stringify({ chips: liveChips, pageLimit, wantQueue, downloadDelaySec, resume, startPageOnce }, null, 2) + "\n");
   } catch (err) {
     log("warn", `could not save nexus.json: ${err instanceof Error ? err.message : err}`);
   }
@@ -338,6 +348,8 @@ function loadLive() {
     liveTags = chipsToQuery(liveChips);
     if (Number.isInteger(j.pageLimit) && j.pageLimit >= 0 && j.pageLimit <= 5000) pageLimit = j.pageLimit;
     if (typeof j.downloadDelaySec === "number" && j.downloadDelaySec >= 0 && j.downloadDelaySec <= 86400) downloadDelaySec = Math.round(j.downloadDelaySec);
+    if (j.resume && typeof j.resume.query === "string" && Number.isInteger(j.resume.page) && j.resume.page > 0) resume = { query: j.resume.query, page: j.resume.page };
+    if (Number.isInteger(j.startPageOnce) && j.startPageOnce > 0 && j.startPageOnce <= 100000) startPageOnce = j.startPageOnce;
     if (Array.isArray(j.wantQueue)) wantQueue = j.wantQueue.map(Number).filter((n) => Number.isInteger(n) && n > 0);
   } catch { /* first boot */ }
   sync();
@@ -1138,6 +1150,23 @@ async function addComicInfo(path, makeXml) {
   }
 }
 
+// Pause: at each safe point (between books, between search pages) wait here until Resume.
+// A book that is already downloading is always finished first. Returns how long it held, in ms.
+async function holdPoint() {
+  if (!softPause) return 0;
+  const epoch = stopEpoch;
+  const t0 = Date.now();
+  status.holding = true;
+  log("info", "Paused. Press Resume to continue.");
+  try {
+    while (softPause && !shuttingDown && stopEpoch === epoch) await wait(300);
+  } finally {
+    status.holding = false;
+  }
+  if (!shuttingDown && stopEpoch === epoch) log("info", "Resumed");
+  return Date.now() - t0;
+}
+
 class Cancelled extends Error {}
 
 // Wait until the gap since the last download has passed. The gap is read again
@@ -1145,6 +1174,11 @@ class Cancelled extends Error {}
 async function waitForDelay(cancelled) {
   try {
     for (;;) {
+      if (softPause) {
+        const held = await holdPoint();
+        if (lastDownloadEnd) lastDownloadEnd += held; // the countdown picks up where it was
+        continue;
+      }
       const due = lastDownloadEnd + downloadDelaySec * 1000;
       const left = due - Date.now();
       if (left <= 0) return;
@@ -1160,6 +1194,10 @@ async function waitForDelay(cancelled) {
 }
 
 async function downloadGallery(id, have, opts = {}) {
+  if (softPause) {
+    const held = await holdPoint();
+    if (lastDownloadEnd) lastDownloadEnd += held;
+  }
   status.state = cfg.dry ? "dry-run" : "downloading";
   status.currentId = id;
   status.currentTitle = "";
@@ -1274,27 +1312,57 @@ async function drainWant(have, skip) {
   }
 }
 
+async function searchDone() {
+  if (resume || startPageOnce) { resume = null; await saveLive(); }
+}
+
 async function searchCycle(have, skip) {
   const query = withSafety(liveTags);
   log("info", `Search ${query}`);
-  let page = 1;
-  let last = 1;
+  const limit = pageLimit;
+  // Where to begin: a page you typed (once), or where the last run stopped, two pages back
+  // (new books push everything down, so a little overlap avoids skipping any).
+  let begin = 1;
+  if (startPageOnce > 0) {
+    begin = startPageOnce;
+    log("info", `Starting at page ${begin}, as you asked (one time)`);
+    startPageOnce = 0;
+  } else if (resume && resume.query === query && resume.page > 1) {
+    begin = Math.max(1, resume.page - 2);
+    log("info", `Picking up the last search: it stopped on page ${resume.page}, so starting from page ${begin}`);
+  }
+  if (limit && begin > limit) {
+    log("info", `Page ${begin} is past your limit of ${limit} pages, so starting from page 1`);
+    begin = 1;
+  }
+  resume = null;
+  let page = begin;
+  let last = Math.max(1, begin);
   let streak = 0;
   let added = 0;
   let prevFirst = null;
-  const limit = pageLimit;
   status.searchLimit = limit;
   while (page <= last && !shuttingDown) {
-    if (paused && !runNow) { log("info", "Paused"); return; }
+    if (paused && !runNow) { log("info", "Stopped"); return; }
+    if (softPause) await holdPoint();
+    if (paused && !runNow) { log("info", "Stopped"); return; }
     if (limit && page > limit) {
       log("info", `Page limit reached: searched the newest ${limit} of ${last} pages`);
       status.message = `Searched the newest ${limit} of ${last} pages`;
+      await searchDone();
       return;
     }
     const html = await http(searchUrl(query, page));
     const parsed = parseSearch(html);
+    if (!parsed.ids.length && page === begin && begin > 1) {
+      log("info", `Page ${begin} has no books (the search is shorter now), so starting from page 1`);
+      page = 1; begin = 1; last = 1;
+      continue;
+    }
     last = Math.max(last, parsed.last);
     status.searchPage = page;
+    resume = { query, page };
+    await saveLive();
     status.searchPages = last;
     status.state = "searching";
     status.message = limit && limit < last ? `Search page ${page} / ${limit} (${last} available)` : `Search page ${page} / ${last}`;
@@ -1308,7 +1376,7 @@ async function searchCycle(have, skip) {
       status.message = why ? `The search found no galleries. ${chipProblems()[0].message}` : "The search found no galleries (see the Log)";
       return;
     }
-    if (parsed.ids[0] === prevFirst) return;
+    if (parsed.ids[0] === prevFirst) { await searchDone(); return; }
     prevFirst = parsed.ids[0];
     log("info", `Search page ${page}/${last} — ${parsed.ids.length} galleries`);
     for (const id of parsed.ids) {
@@ -1320,6 +1388,7 @@ async function searchCycle(have, skip) {
         if (cfg.streakCap && streak >= cfg.streakCap) {
           log("info", `Caught up after ${streak} already handled`);
           status.message = `Caught up after ${streak} already in library`;
+          await searchDone();
           return;
         }
         continue;
@@ -1336,6 +1405,7 @@ async function searchCycle(have, skip) {
     }
     page += 1;
   }
+  if (!shuttingDown) await searchDone();
 }
 
 async function runCycle() {
@@ -1363,9 +1433,15 @@ async function runCycle() {
     }
   }
   if (liveTags && !shuttingDown && !(paused && !runNow)) {
-    await checkChips();
-    for (const pr of chipProblems()) log("warn", `Filter check: ${pr.message}`);
-    await searchCycle(have, skip);
+    await holdPoint();
+    if (!(paused && !runNow)) {
+      await checkChips();
+      await holdPoint();
+    }
+    if (!(paused && !runNow)) {
+      for (const pr of chipProblems()) log("warn", `Filter check: ${pr.message}`);
+      await searchCycle(have, skip);
+    }
   }
   if (!liveTags && !listed.length && !wantQueue.length) {
     status.state = "stopped";
@@ -1552,7 +1628,14 @@ function startServer(port) {
     if (url.pathname === "/api/control" && req.method === "POST") {
       readBody(req).then(async (body) => {
         const action = String(body.action || "");
-        if (action === "stop" || action === "pause") {
+        if (action === "hold") {
+          if (paused) return json(res, 400, { error: "It is stopped. Press Start first." });
+          softPause = true;
+          log("info", "Pause requested: finishing the current book first");
+        } else if (action === "release") {
+          softPause = false;
+        } else if (action === "stop" || action === "pause") {
+          softPause = false;
           paused = true;
           runNow = false;
           queueArmed = false;
@@ -1564,12 +1647,24 @@ function startServer(port) {
           wake();
         } else if (action === "start" || action === "run") {
           if (!session.loggedIn && !cfg.dry) return json(res, 400, { error: "Log in first, then press Start." });
+          softPause = false;
           paused = false;
           runNow = true;
           queueArmed = true;
           log("info", action === "start" ? "Start" : "Run now");
           wake();
         } else return json(res, 400, { error: "action must be start or stop" });
+        await saveLive();
+        json(res, 200, snapshot());
+      }).catch((err) => json(res, 400, { error: err.message }));
+      return;
+    }
+    if (url.pathname === "/api/startpage" && req.method === "POST") {
+      readBody(req).then(async (body) => {
+        const n = Number(body.page);
+        if (!Number.isInteger(n) || n < 0 || n > 100000) return json(res, 400, { error: "Enter a page number, or 0 to clear it." });
+        startPageOnce = n;
+        log("info", n ? `The next search will start at page ${n}` : "Start page cleared");
         await saveLive();
         json(res, 200, snapshot());
       }).catch((err) => json(res, 400, { error: err.message }));
@@ -1594,6 +1689,7 @@ function startServer(port) {
           const chips = body.chips !== undefined ? cleanChips(body.chips) : parseQueryToChips(String(body.tags ?? "").slice(0, 500));
           if (!chips) return json(res, 400, { error: "Those filters are not valid (up to 60, values up to 100 characters, no quote marks)." });
           liveChips = chips;
+          resume = null;
           liveTags = chipsToQuery(chips);
           log("info", `Query saved: ${liveTags || "(empty)"}`);
           checkChips().catch(() => {});

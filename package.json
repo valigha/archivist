@@ -2,7 +2,7 @@
   "name": "archivist",
   "private": true,
   "type": "module",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Folio (nhentai) and Nexus (HentaiNexus) archivists in one container, one tabbed page, one shared library",
   "scripts": { "start": "node gateway/server.mjs" },
   "dependencies": { "jszip": "^3.10.1" }
