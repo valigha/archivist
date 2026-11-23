@@ -6,10 +6,16 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.2.0` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.2.0` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.2.1` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.2.1` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.2.1
+
+- Nexus reads a book's title from the page in more ways (a heading with any class, the page's title tag, or a plain heading) instead of only one exact form. A page where none work is now logged as a warning (`could not find the title on the page`) rather than quietly naming the file by number only, which is what LANraragi then shows
+- A book with no title is named `HN123.cbz`, not `HN123 123.cbz`
+- Books already saved with number-only names are not renamed
 
 ## 0.2.0
 
