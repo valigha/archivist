@@ -109,7 +109,13 @@ export function parseGalleryRefs(text) {
   return ids;
 }
 
+// Files that another site's tool wrote end in " [TAG].cbz" (Nexus uses [HN]). They also start with a
+// number, but it is that site's id, so they must never count as an nhentai gallery.
+const OTHER_TOOL_TAG = String(process.env.FILE_TAG ?? "HN").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 8);
+const OTHER_TOOL_RE = OTHER_TOOL_TAG ? new RegExp(`\\s\\[${OTHER_TOOL_TAG}\\]\\.cbz$`, "i") : null;
+
 export function idFromFilename(name) {
+  if (OTHER_TOOL_RE && OTHER_TOOL_RE.test(String(name))) return null;
   const m = String(name).match(/^(\d+)\b/);
   return m ? Number(m[1]) : null;
 }
