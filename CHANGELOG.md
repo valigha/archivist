@@ -6,10 +6,14 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.2.1` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.2.1` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.2.2` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.2.2` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.2.2
+
+- Fix for Nexus downloads failing with `fetch failed: UND_ERR_HEADERS_OVERFLOW`. The site's reply carried more header data than Node's 16 KB default allows, so that book failed every time. Both apps now accept much larger headers (256 KB)
 
 ## 0.2.1
 
