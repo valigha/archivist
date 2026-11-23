@@ -362,7 +362,8 @@ function libraryDir(id) {
 }
 
 function safeName(id, title) {
-  const cleaned = String(title).replace(/[\\/:*?"<>|\t\n]/g, "").replace(/\s+/g, " ").trim();
+  let cleaned = String(title).replace(/[\\/:*?"<>|\t\n]/g, "").replace(/\s+/g, " ").trim();
+  if (cleaned === String(id)) cleaned = ""; // no real title found: just the number, not "HN123 123"
   const overhead = `${cfg.prefix}${id} .cbz`.length;
   let out = "";
   let bytes = 0;
@@ -684,8 +685,26 @@ function cellValues(inner) {
   return text ? [text] : [];
 }
 
+// The title is read from the page in several ways, because the site's markup can differ
+// (a different class on the heading, or no heading at all for some pages).
+function findTitle(html) {
+  const clean = (s) => decode(String(s || "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+  const tries = [
+    () => html.match(/<h1[^>]*class="[^"]*\btitle\b[^"]*"[^>]*>([\s\S]*?)<\/h1>/i)?.[1],
+    () => html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1],
+    () => (html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || "").replace(/\s*[-–|·]\s*Hentai\s?Nexus.*$/i, ""),
+    () => html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1],
+  ];
+  for (const t of tries) {
+    const v = clean(t());
+    if (v && !/^hentai\s?nexus$/i.test(v)) return v;
+  }
+  return "";
+}
+
 function parseGallery(html, id) {
-  const title = decode((html.match(/<h1 class="title">([\s\S]*?)<\/h1>/) || [])[1] || String(id));
+  const title = findTitle(html);
+  if (!title) log("warn", `#${id}: could not find the title on the page, so the file will be named by number only`);
   const fields = {};
   for (const m of html.matchAll(/<td class="viewcolumn">([^<]+)<\/td>\s*<td>([\s\S]*?)<\/td>/g)) {
     fields[decode(m[1]).toLowerCase()] = cellValues(m[2]);
@@ -698,7 +717,7 @@ function parseGallery(html, id) {
   const tags = fields.tags || [];
   const blob = [title, ...Object.values(fields).flat()].join(" ");
   return {
-    id, title, tags, pageNums,
+    id, title: title || String(id), tags, pageNums,
     artist: (fields.artist || []).join(", "),
     magazine: (fields.magazine || []).join(", "),
     parody: (fields.parody || []).join(", "),
