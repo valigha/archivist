@@ -6,10 +6,18 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.1.5` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.1.5` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.2.0` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.2.0` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.2.0
+
+- Nexus: new **Pause / Resume** button. Pause lets the book that is downloading finish, then holds (between books and between search pages) until you press Resume. The clock freezes and picks up where it was. Stop still ends the run
+- **Search page is remembered, in both Folio and Nexus.** The page the search is on is saved after every page, so a restart or a crash no longer sends you back to page 1. The next run starts two pages before where it stopped (new books push the pages down, so this avoids skipping any). It is cleared when the search finishes or when you change the search chips
+- **Start the next search at page …** box in both Folio and Nexus: type a page and press Set, and the next run starts there once. 0 clears it
+- Nexus still needs Start pressed after a restart; it then picks up from the saved page
+- Folio: Pause already finished the current gallery; pressing Run now afterwards now carries on from the saved page
 
 ## 0.1.5
 

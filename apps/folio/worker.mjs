@@ -39,7 +39,7 @@ import {
 // Archivist: log folder is configurable so several apps can share one container.
 const LOG_DIR = process.env.LOG_DIR || "/app/log";
 
-const API = "https://nhentai.net/api/v2";
+const API = process.env.NHENTAI_API_BASE || "https://nhentai.net/api/v2"; // override is for testing
 const DEFAULT_UA =
   "Folio/1.0 (nhentai API v2 archivist; +https://nhentai.net/api/v2/docs)";
 
@@ -91,6 +91,8 @@ const status = {
   cycles: [],
   searchMode: "full",
   searchPageCap: 0,
+  resume: null, // { query, page, incremental } where the search was when it last stopped
+  startPageOnce: 0, // one-off start page you typed
   incrementalPages: 10,
   lastFullAt: null,
   nextCycleFull: true,
@@ -113,6 +115,8 @@ let runNow = false;
 let abortCycle = false;
 let cycles = [];
 let incrementalPages = cfg.INCREMENTAL_PAGES ?? 10;
+let resume = null; // { query, page, incremental }
+let startPageOnce = 0;
 let lastFullQuery = "";
 let lastFullAt = null;
 let forceFullNext = false;
@@ -262,6 +266,13 @@ async function runCycle() {
   await persistStatus();
 }
 
+async function searchDone() {
+  if (resume || startPageOnce) {
+    resume = null;
+    await saveLive();
+  }
+}
+
 async function searchAndDownload(have, skip, cdn) {
   if (!liveTags.length) return;
   const query = applySafety(liveTags.join(" "), cfg.SAFETY_FILTER);
@@ -285,8 +296,24 @@ async function searchAndDownload(have, skip, cdn) {
       : `Full search “${query}” sort=${cfg.SEARCH_SORT}${plan.cap ? ` cap=${plan.cap}` : ""}`,
   );
 
-  let page = 1;
-  let pages = 1;
+  // Where to begin: a page you typed (once), or where the last run stopped, two pages back
+  // (new books push everything down, so a little overlap avoids skipping any).
+  let begin = 1;
+  if (startPageOnce > 0) {
+    begin = startPageOnce;
+    log("info", `Starting at page ${begin}, as you asked (one time)`);
+    startPageOnce = 0;
+  } else if (resume && resume.query === query && resume.incremental === plan.incremental && resume.page > 1) {
+    begin = Math.max(1, resume.page - 2);
+    log("info", `Picking up the last search: it stopped on page ${resume.page}, so starting from page ${begin}`);
+  }
+  if (plan.cap > 0 && begin > plan.cap) {
+    log("info", `Page ${begin} is past the ${plan.cap}-page limit, so starting from page 1`);
+    begin = 1;
+  }
+  resume = null;
+  let page = begin;
+  let pages = Math.max(1, begin);
   let streak = 0;
   let added = 0;
   const collected = [];
@@ -304,6 +331,7 @@ async function searchAndDownload(have, skip, cdn) {
         ? `Incremental cap of ${plan.cap} pages reached`
         : `MAX_SEARCH_PAGES=${plan.cap} reached`);
       await writeDownloadme(collected);
+      await searchDone();
       maybeMarkFull(query, plan.incremental);
       return;
     }
@@ -317,6 +345,13 @@ async function searchAndDownload(have, skip, cdn) {
         })}`,
       );
     } catch (err) {
+      if (page === begin && begin > 1 && err?.code !== "RATE_LIMIT" && !shuttingDown) {
+        log("info", `Page ${begin} could not be read (${err instanceof Error ? err.message : err}); starting from page 1 instead`);
+        page = 1;
+        begin = 1;
+        pages = 1;
+        continue;
+      }
       if (err?.code === "RATE_LIMIT") {
         log("warn", "Search hit rate limit — stopping this cycle.");
         status.state = "rate-limited";
@@ -330,6 +365,15 @@ async function searchAndDownload(have, skip, cdn) {
     }
     pages = data.num_pages || 1;
     const rows = data.result || data.galleries || data.items || [];
+    if (!rows.length && page === begin && begin > 1) {
+      log("info", `Page ${begin} has no books (the search is shorter now), so starting from page 1`);
+      page = 1;
+      begin = 1;
+      pages = 1;
+      continue;
+    }
+    resume = { query, page, incremental: plan.incremental };
+    await saveLive();
     status.searchPage = page;
     status.searchPages = pages;
     status.searchTotal = Number(data.total) || status.searchTotal;
@@ -362,6 +406,7 @@ async function searchAndDownload(have, skip, cdn) {
           status.cycleReason = "caught-up";
           pushEvent("caught-up", { title: `Caught up after ${streak} already in library` });
           await writeDownloadme(collected);
+          await searchDone();
           await maybeMarkFull(query, plan.incremental);
           return;
         }
@@ -405,6 +450,7 @@ async function searchAndDownload(have, skip, cdn) {
   }
   await writeDownloadme(collected);
   if (!status.cycleReason) status.cycleReason = "complete";
+  if (!shuttingDown) await searchDone();
   await maybeMarkFull(query, plan.incremental);
 }
 
@@ -784,6 +830,8 @@ function syncTagStatus() {
   status.tags = liveTags.length ? applySafety(liveTags.join(" "), cfg.SAFETY_FILTER) : "";
   status.mode = liveTags.length ? "server" : "client";
   status.paused = paused;
+  status.resume = resume;
+  status.startPageOnce = startPageOnce;
   status.incrementalPages = incrementalPages;
   status.lastFullAt = lastFullAt;
   const plan = searchPageCap({
@@ -821,6 +869,10 @@ function loadLive() {
     if (typeof j.lastFullQuery === "string") lastFullQuery = j.lastFullQuery;
     if (typeof j.lastFullAt === "string") lastFullAt = j.lastFullAt;
     if (typeof j.forceFullNext === "boolean") forceFullNext = j.forceFullNext;
+    if (j.resume && typeof j.resume.query === "string" && Number.isInteger(j.resume.page) && j.resume.page > 0) {
+      resume = { query: j.resume.query, page: j.resume.page, incremental: Boolean(j.resume.incremental) };
+    }
+    if (Number.isInteger(j.startPageOnce) && j.startPageOnce > 0 && j.startPageOnce <= 100000) startPageOnce = j.startPageOnce;
     if (typeof j.requestDelayMs === "number" || Number.isFinite(Number(j.requestDelayMs))) {
       requestDelayMs = Math.max(DELAY_FLOOR, Math.min(DELAY_MAX_MS, Number(j.requestDelayMs)));
     }
@@ -853,6 +905,8 @@ async function saveLive() {
           lastFullQuery,
           lastFullAt,
           forceFullNext,
+          resume,
+          startPageOnce,
           requestDelayMs,
           wantQueue,
           wantBatchIds,
@@ -1260,6 +1314,23 @@ function startStatusServer(port) {
         .catch((err) => json(res, 400, { error: err instanceof Error ? err.message : String(err) }));
       return;
     }
+    if (path === "/api/startpage" && req.method === "POST") {
+      readJsonBody(req)
+        .then(async (body) => {
+          const n = Number(body.page);
+          if (!Number.isInteger(n) || n < 0 || n > 100000) {
+            json(res, 400, { error: "Enter a page number, or 0 to clear it." });
+            return;
+          }
+          startPageOnce = n;
+          log("info", n ? `The next search will start at page ${n}` : "Start page cleared");
+          syncTagStatus();
+          await saveLive();
+          json(res, 200, snapshot());
+        })
+        .catch((err) => json(res, 400, { error: err instanceof Error ? err.message : String(err) }));
+      return;
+    }
     if (path === "/api/want" && req.method === "POST") {
       readJsonBody(req)
         .then(async (body) => {
@@ -1333,6 +1404,7 @@ function startStatusServer(port) {
               json(res, 400, { error: "tags must be an array of strings" });
               return;
             }
+            if (next.join("\n") !== liveTags.join("\n")) resume = null;
             liveTags = next;
           }
           if (body.incrementalPages != null) {

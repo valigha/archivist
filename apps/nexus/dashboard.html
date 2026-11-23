@@ -481,6 +481,7 @@
 
     <div class="controls">
       <button type="button" class="primary" id="btnToggle">Start</button>
+      <button type="button" id="btnHold" class="hidden">Pause</button>
       <button type="button" id="btnRun" class="hidden">Run now</button>
       <span class="hint" id="controlHint">Nothing runs until you press Start.</span>
     </div>
@@ -551,6 +552,13 @@
         <span class="now-meta">pages (0 = all pages)</span>
       </div>
       <p class="now-meta" id="pageNote"></p>
+      <div class="inc-row">
+        <span class="now-meta">Start the next search at page</span>
+        <input id="startPage" type="number" min="0" max="100000" step="1" placeholder="1" aria-label="Start the next search at this page"/>
+        <button type="button" id="btnStartPage">Set</button>
+        <span class="now-meta">(one time; 0 clears it)</span>
+      </div>
+      <p class="now-meta" id="resumeNote"></p>
     </section>
 
     <section class="card query-card">
@@ -641,6 +649,7 @@
       return json;
     }
     const hint = (t) => { $("controlHint").textContent = t; };
+    let pausedHint = false;
 
     function paintBanner() {
       const el = $("banner");
@@ -666,7 +675,11 @@
     function tick() {
       if (!data) return;
       const clock = $("clock"), label = $("clockLabel");
-      if (data.pauseUntil) {
+      if (data.holding) {
+        label.textContent = "Paused";
+        clock.textContent = "—:—";
+        clock.className = "clock sleeping";
+      } else if (data.pauseUntil) {
         label.textContent = "Trying again in";
         clock.textContent = hms(new Date(data.pauseUntil).getTime() - Date.now());
         clock.className = "clock sleeping";
@@ -709,6 +722,14 @@
       bar.className = "bar";
       pct.textContent = "";
       fill.style.width = "0";
+      if (data.holding) {
+        const pg = data.searchPage ? "Search page " + data.searchPage + (data.searchPages ? " of " + data.searchPages : "") + " · " : "";
+        title.textContent = "Paused";
+        meta.textContent = pg + "Press Resume to carry on from here.";
+        bar.className = "bar warn";
+        fill.style.width = "100%";
+        return;
+      }
       if (data.pauseUntil) {
         const left = new Date(data.pauseUntil).getTime() - Date.now();
         const full = data.pauseMs || 0;
@@ -839,6 +860,24 @@
       t.textContent = running ? "Stop" : "Start";
       t.className = running ? "stop" : "primary";
       $("btnRun").classList.toggle("hidden", !running);
+      const h = $("btnHold");
+      h.classList.toggle("hidden", !running);
+      h.textContent = data.pauseRequested ? "Resume" : "Pause";
+      h.className = data.pauseRequested ? "primary" : "";
+      if (running && data.pauseRequested) {
+        hint(data.holding ? "Paused. Press Resume to carry on." : "Pausing: finishing the current book first…");
+        pausedHint = true;
+      } else if (pausedHint) {
+        hint("");
+        pausedHint = false;
+      }
+      // where the next search will begin
+      const note = [];
+      if (data.startPageOnce) note.push("The next search starts at page " + data.startPageOnce + " (one time).");
+      else if (data.resume && data.resume.page > 1) note.push("The last search stopped on page " + data.resume.page + ", so the next one starts from page " + Math.max(1, data.resume.page - 2) + ".");
+      $("resumeNote").textContent = note.join(" ");
+      const sp = $("startPage");
+      if (document.activeElement !== sp) sp.value = data.startPageOnce ? String(data.startPageOnce) : "";
     }
 
     function wantLabel(e) {
@@ -888,8 +927,9 @@
     function paint() {
       if (!data) return;
       try {
-        $("badge").textContent = data.state || "unknown";
-        $("badge").className = "badge " + (data.state || "");
+        const shown = data.holding ? "paused" : (data.state || "unknown");
+        $("badge").textContent = shown;
+        $("badge").className = "badge " + (data.holding ? "paused" : (data.state || ""));
         const n = (data.chips || []).length;
         $("tags").textContent = n ? n + " chip" + (n === 1 ? "" : "s") : "No query yet";
         $("sLibrary").textContent = (data.libraryTotal || 0).toLocaleString();
@@ -1003,6 +1043,14 @@
       const running = !!(data && data.running);
       hint(running ? "Stopping…" : "Starting…");
       postJSON("/api/control", { action: running ? "stop" : "start" }).then(() => hint(running ? "Stopped." : "Started.")).catch((e) => hint(e.message));
+    });
+    $("btnHold").addEventListener("click", () => {
+      const holding = !!(data && data.pauseRequested);
+      postJSON("/api/control", { action: holding ? "release" : "hold" }).catch((e) => hint(e.message));
+    });
+    $("btnStartPage").addEventListener("click", () => {
+      const n = Number($("startPage").value || 0);
+      postJSON("/api/startpage", { page: n }).then(() => hint(n ? "The next search will start at page " + n + "." : "Start page cleared.")).catch((e) => hint(e.message));
     });
     $("btnRun").addEventListener("click", () => {
       hint("Starting a new run…");
