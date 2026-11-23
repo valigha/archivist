@@ -18,7 +18,7 @@ Stop the separate `folio-archivist` and `nexus-archivist` containers first. Sett
 
 Plain names are shared by both apps (`LIBRARY_SPLIT`, `SLEEP_INTERVAL`, `PUID`, `PGID`, `UMASK`, `TZ`). To change one app only, put `FOLIO_` or `NEXUS_` in front: `NEXUS_REQUEST_DELAY_MS=3000` affects Nexus only. App-specific names such as `NHENTAI_TAGS` or `HN_TAGS` also work with the prefix. See `env.example`.
 
-Files in the library: Folio names start with the gallery number, Nexus names start with `HN`, so ids from the two sites never clash.
+Files in the library: Folio names are `<id> <title>.cbz`. Nexus names are `<id> <title> [HN].cbz`, with the tag `[HN]` at the end, so the two sites' ids never clash and both apps still sort and show titles the same way. Set `FILE_TAG` (shared by both apps) to use a different tag. Older Nexus files named `HN<id> <title>.cbz` are renamed to the new style automatically the first time the container starts (set `RENAME_OLD_FILES=0` to switch that off).
 
 ## Versions and rollback
 

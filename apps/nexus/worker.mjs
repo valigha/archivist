@@ -52,9 +52,9 @@ const cfg = {
   // 0 = off. Both default to off so a cycle reads every page up to the page limit.
   streakCap: Math.max(0, envNum("CATCH_UP_STREAK", 0)),
   maxPerCycle: Math.max(0, envNum("MAX_PER_CYCLE", 0)),
-  // File names start with this prefix so a library shared with another tool
-  // (whose names start with a bare number) never mixes up the two sites' ids.
-  prefix: String(process.env.FILE_PREFIX ?? "HN").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 8),
+  // File names end with " [TAG]" (for example "21950 Some Title [HN].cbz") so a library shared with
+  // another tool (whose names are a bare number and title) never mixes up the two sites' ids.
+  tag: String(process.env.FILE_TAG ?? "HN").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 8),
   zipTimeout: Math.max(60, Number(process.env.ZIP_TIMEOUT_SEC) || 900),
   cooldown: Math.max(1, Number(process.env.ZIP_COOLDOWN_SEC) || 120),
   stall: Math.max(2, Number(process.env.ZIP_STALL_SEC) || 30),
@@ -73,7 +73,7 @@ const status = {
   state: "starting",
   paused: false,
   cycle: 0,
-  libraryCount: 0, // books this tool wrote (names with the prefix)
+  libraryCount: 0, // books this tool wrote (names ending with the tag)
   libraryTotal: 0, // every .cbz in the library, including other tools' books
   libraryScanning: false,
   libraryScannedAt: null,
@@ -364,7 +364,8 @@ function libraryDir(id) {
 function safeName(id, title) {
   let cleaned = String(title).replace(/[\\/:*?"<>|\t\n]/g, "").replace(/\s+/g, " ").trim();
   if (cleaned === String(id)) cleaned = ""; // no real title found: just the number, not "HN123 123"
-  const overhead = `${cfg.prefix}${id} .cbz`.length;
+  const suffix = cfg.tag ? ` [${cfg.tag}]` : "";
+  const overhead = `${id} .cbz`.length + suffix.length;
   let out = "";
   let bytes = 0;
   for (const ch of cleaned) {
@@ -373,7 +374,7 @@ function safeName(id, title) {
     out += ch;
     bytes += size;
   }
-  return `${cfg.prefix}${id}${out ? ` ${out}` : ""}.cbz`;
+  return `${id}${out ? ` ${out}` : ""}${suffix}.cbz`;
 }
 
 async function throttleHtml() {
@@ -745,7 +746,48 @@ function comicInfo(g) {
     `  <Manga>YesAndRightToLeft</Manga>\n</ComicInfo>\n`;
 }
 
-const idPattern = new RegExp(`^${cfg.prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d+)\\b`);
+const tagRe = cfg.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// New names: "21950 Title [HN].cbz". Older versions wrote "HN21950 Title.cbz"; both are recognised.
+const tagEnd = new RegExp(`^(\\d+)\\b.*\\s\\[${tagRe}\\]\\.cbz$|^(\\d+)\\s\\[${tagRe}\\]\\.cbz$`, "i");
+const oldPrefix = new RegExp(`^${tagRe}(\\d+)\\b`);
+function idFromName(name) {
+  if (!cfg.tag) { const m = name.match(/^(\d+)\b/); return m ? Number(m[1]) : null; }
+  const a = name.match(tagEnd);
+  if (a) return Number(a[1] || a[2]);
+  const b = name.match(oldPrefix);
+  return b ? Number(b[1]) : null;
+}
+
+// One-time tidy-up: rename books saved by older versions ("HN21950 Title.cbz") to the new
+// style ("21950 Title [HN].cbz"). Only that exact old pattern is touched, and nothing is
+// ever overwritten.
+async function migrateOldNames(root) {
+  if (!cfg.tag || process.env.RENAME_OLD_FILES === "0") return 0;
+  let done = 0;
+  async function walk(dir, depth) {
+    let entries;
+    try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory() && depth < 2 && !entry.name.startsWith(".tmp-")) { await walk(full, depth + 1); continue; }
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".cbz")) continue;
+      const m = entry.name.match(oldPrefix);
+      if (!m) continue;
+      const rest = entry.name.slice(cfg.tag.length + m[1].length, -4).trim();
+      const next = `${m[1]}${rest ? ` ${rest}` : ""} [${cfg.tag}].cbz`;
+      if (Buffer.byteLength(next) > 255) continue;
+      try {
+        if (await exists(join(dir, next))) continue;
+        await rename(full, join(dir, next));
+        done += 1;
+      } catch (err) {
+        log("warn", `Could not rename ${entry.name}: ${describeError(err)}`);
+      }
+    }
+  }
+  await walk(root, 0);
+  return done;
+}
 
 async function indexLibrary(root) {
   const ids = new Set();
@@ -757,8 +799,8 @@ async function indexLibrary(root) {
       const full = join(dir, entry.name);
       if (entry.isDirectory() && depth < 2 && !entry.name.startsWith(".tmp-")) await scan(full, depth + 1);
       else if (entry.isFile() && entry.name.toLowerCase().endsWith(".cbz")) {
-        const m = entry.name.match(idPattern);
-        if (m) ids.add(Number(m[1]));
+        const id = idFromName(entry.name);
+        if (id) ids.add(id);
         else other += 1;
       }
     }
@@ -786,7 +828,7 @@ async function rescanLibrary(why) {
     setLibraryCounts(have);
     status.libraryScannedAt = new Date().toISOString();
     if (why !== "periodic") {
-      log("info", `Library: ${status.libraryTotal} .cbz in total, ${have.size} ${cfg.prefix ? cfg.prefix + " " : ""}from this tool, ${have.other} from other tools (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+      log("info", `Library: ${status.libraryTotal} .cbz in total, ${have.size} ${cfg.tag ? cfg.tag + " " : ""}from this tool, ${have.other} from other tools (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
       if (!status.libraryTotal) log("warn", `Nothing found in ${cfg.library}. If your books are elsewhere, change the Library path in the container settings.`);
     }
   } catch (err) {
@@ -1853,9 +1895,12 @@ async function main() {
   loadSession();
   if (cfg.port) startServer(cfg.port);
   log("info", `Nexus archivist ${VERSION}. library=${cfg.library} delay=${cfg.delay}ms query=${status.tags || "(none)"}`);
-  log("info", `Files are named ${cfg.prefix}<id> <title>.cbz${cfg.prefix ? "" : " (no prefix: do not share this folder with another site's tool)"}`);
+  log("info", `Files are named <id> <title>${cfg.tag ? ` [${cfg.tag}]` : ""}.cbz${cfg.tag ? "" : " (no tag: do not share this folder with another site's tool)"}`);
   log("info", `login=${session.loggedIn ? `saved session for ${session.user}` : session.expired ? "expired" : "not logged in"} download-delay=${fmtDuration(downloadDelaySec * 1000)} user-agent=${process.env.USER_AGENT ? "custom" : "default"}`);
-  rescanLibrary("boot");
+  migrateOldNames(cfg.library)
+    .then((n) => { if (n) log("info", `Renamed ${n} book(s) saved by an older version to the new style (<id> <title> [${cfg.tag}].cbz)`); })
+    .catch((err) => log("warn", `Renaming older files failed: ${describeError(err)}`))
+    .finally(() => rescanLibrary("boot"));
   // Pick up books other tools add, now and then, without a restart.
   setInterval(() => { if (!shuttingDown) rescanLibrary("periodic"); }, 60 * 60_000).unref();
   if (skippedFilters.length) log("warn", `Ignored filters the site cannot search: ${[...new Set(skippedFilters)].join(", ")}`);

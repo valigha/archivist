@@ -6,10 +6,18 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.2.2` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.2.2` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.3.0` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.3.0` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.3.0
+
+- **Nexus file names change.** The `HN` marker moves from the start to the end: `HN21950 Evening Light 2.cbz` becomes `21950 Evening Light 2 [HN].cbz`. The name now starts with the book number and title like Folio's, which suits LANraragi and other viewers
+- Folio ignores files ending in `[HN]`, and Nexus only counts files that carry the tag, so a Nexus book and a Folio book with the same number never get mixed up (verified: both #101 downloaded side by side)
+- On first start, books saved by older versions (`HN21950 Title.cbz`) are renamed to the new style, in the same folder, and never over an existing file. The log says how many. Set `RENAME_OLD_FILES=0` to skip this
+- The setting is now `FILE_TAG` (default `HN`); it replaces `FILE_PREFIX`. Set it as a shared variable, not with a `FOLIO_` or `NEXUS_` prefix, so both apps agree
+- Note for LANraragi: renamed files keep their content, so it should keep their entries, but a rescan may be needed
 
 ## 0.2.2
 
