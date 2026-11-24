@@ -6,10 +6,14 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.4.0` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.4.0` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.4.1` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.4.1` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.4.1
+
+- Fix in `userscripts/nexus-hentainexus.user.js` (now 1.4.1): the script resized some thumbnails on hentainexus.com so they overlapped. It no longer changes any layout; it only places the Add button over each card. Update the script in Tampermonkey; the container itself is unchanged apart from the version number
 
 ## 0.4.0
 
