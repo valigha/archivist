@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         HentaiNexus → Archivist (Nexus)
 // @namespace    local.library.hentainexus
-// @version      1.4.2
+// @version      1.4.3
 // @description  Add HentaiNexus books to your Archivist library, and mark ones already in it
 // @match        https://hentainexus.com/*
 // @match        https://www.hentainexus.com/*
@@ -254,16 +254,28 @@
     }
   }
 
-  // The link around a card can be wider than the card you see, so pin the button to the
-  // picture's own top-right corner instead of the link's. Only the button moves; the page does not.
+  // The link around a card can be wider than the card you see, and the picture can be wider
+  // than the card too (the card crops it). So take the right edge from the picture as the card
+  // actually shows it: its box, cut down by every cropping parent up to the link. The top stays
+  // at the link's top (the card's title bar). Only the button moves; the page does not.
+  function visibleRight(anchor, img) {
+    let right = img.getBoundingClientRect().right;
+    for (let el = img.parentElement; el && el !== anchor.parentElement; el = el.parentElement) {
+      const ov = getComputedStyle(el);
+      if (ov.overflowX !== "visible" || ov.overflow !== "visible") right = Math.min(right, el.getBoundingClientRect().right);
+      if (el === anchor) break;
+    }
+    return right;
+  }
+
   function place(anchor, btn) {
     const img = anchor.querySelector("img");
     if (!img) return;
-    const a = anchor.getBoundingClientRect();
     const i = img.getBoundingClientRect();
     if (!i.width) return;
-    btn.style.top = Math.max(0, Math.round(i.top - a.top)) + 6 + "px";
-    btn.style.right = Math.max(0, Math.round(a.right - i.right)) + 6 + "px";
+    const a = anchor.getBoundingClientRect();
+    btn.style.top = "6px";
+    btn.style.right = Math.max(0, Math.round(a.right - visibleRight(anchor, img))) + 6 + "px";
   }
 
   function bindCard(anchor) {
