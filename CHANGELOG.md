@@ -6,10 +6,15 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.4.1` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.4.1` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.4.2` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.4.2` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.4.2
+
+- A book you add yourself (the Add button in the browser scripts, or pasting it on the Folio or Nexus page) is no longer stopped by an entry in the blacklist (`dontdownloadme.txt`). The log says `was on the blacklist; a manual add overrides that`, and the id is removed from the file. Automatic searches still honour the blacklist
+- The tag safety check is **not** bypassed by a manual add. A book carrying a blocked tag is still refused and blacklisted again, whoever asked for it
 
 ## 0.4.1
 
