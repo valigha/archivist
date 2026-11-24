@@ -6,10 +6,18 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.9.1` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.9.1` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.9.2` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.9.2` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.9.2
+
+- **Nexus now waits out a lost connection instead of retrying every few seconds.** When the internet (or the site) cannot be reached at all, it waits 1 minute after the first failed try, then 1 minute longer after each further try (1, 2, 3, 4 ... minutes). It never gives up and it does not skip the book or search page; it carries on from the same place when the connection returns, and logs `Connection is back`
+- **Pause then Resume cuts a wait short**: it tries again at once, and the waits start again from 1 minute. Stop cancels the wait
+- This covers search pages, book pages and downloads. It applies only when nothing can be reached (no internet, DNS not answering, host unreachable, connection refused). A site that answers with an error, a reset connection or a stalled download is handled as before
+- The wait has no upper limit, as asked, so a long outage ends in long waits; use Pause then Resume once the connection is back to start again from 1 minute
+- Folio is unchanged in this version
 
 ## 0.9.1
 

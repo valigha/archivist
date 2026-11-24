@@ -266,6 +266,43 @@ function isTransient(err) {
   return err?.name === "TimeoutError" || ["ECONNRESET", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET", "EAI_AGAIN"].includes(code);
 }
 
+// The connection itself is down (no internet, DNS not answering, host unreachable), as opposed
+// to the site answering badly. These are waited out instead of being given up on.
+// One minute per step; the seconds can be changed for testing only.
+const OFFLINE_STEP_MS = Math.max(1, Number(process.env.OFFLINE_STEP_SECONDS) || 60) * 1000;
+const OFFLINE_CODES = new Set(["ENOTFOUND", "EAI_AGAIN", "ENETUNREACH", "EHOSTUNREACH", "ECONNREFUSED", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT"]);
+function isOffline(err) {
+  const cause = err?.cause;
+  const code = cause?.code || (Array.isArray(cause?.errors) ? cause.errors[0]?.code : "") || "";
+  return OFFLINE_CODES.has(code);
+}
+
+// Wait for the connection to come back. After the first failed try it waits 1 minute, then one
+// minute more after every further try (1, 2, 3, ... minutes), with no upper limit and no giving
+// up. Pause then Resume cuts the wait short and tries again at once, starting again from
+// 1 minute; Stop cancels it.
+async function offlineWait(tries, err, url) {
+  const ms = tries * OFFLINE_STEP_MS;
+  log("warn", `No connection (${describeError(err)}) (${url}) - try ${tries}, trying again in ${fmtDuration(ms)}. Pause then Resume tries again now.`);
+  const myStop = stopEpoch;
+  let resumed = false;
+  await retryPause(ms, "the internet or the site cannot be reached", async (n) => {
+    const end = Date.now() + n;
+    while (Date.now() < end) {
+      if (shuttingDown || stopEpoch !== myStop) throw new Cancelled("cancelled");
+      if (softPause) {
+        status.pauseUntil = null;
+        await holdPoint();
+        if (shuttingDown || stopEpoch !== myStop) throw new Cancelled("cancelled");
+        resumed = true;
+        return;
+      }
+      await wait(Math.min(500, end - Date.now()));
+    }
+  });
+  return resumed;
+}
+
 function sleep(ms) {
   return new Promise((resolve) => {
     sleepResolve = resolve;
@@ -625,13 +662,20 @@ async function http(url, { referer } = {}) {
     if (ck) headers.Cookie = ck;
   }
   let last = "no response";
+  let offlineTries = 0;
   for (let i = 0; i < 5; i++) {
     await throttleHtml();
     let res;
     try {
       res = await fetch(url, { headers, redirect: "follow", signal: AbortSignal.timeout(60_000) });
+      if (offlineTries) { log("info", "Connection is back"); offlineTries = 0; }
     } catch (err) {
       last = describeError(err);
+      if (isOffline(err)) {
+        offlineTries = (await offlineWait(offlineTries + 1, err, url)) ? 0 : offlineTries + 1;
+        i--;
+        continue;
+      }
       if (isTransient(err) && i < 4) {
         const pause = Math.min(60_000, 3000 * 2 ** i);
         log("warn", `${last} (${url}) - retrying in ${Math.round(pause / 1000)}s`);
@@ -944,6 +988,7 @@ async function httpFile(url, dest, { referer } = {}) {
   let got = 0; // bytes already on disk
   let interruptions = 0;
   let rangeState = "unknown"; // does the server honour Range? learned from its answer
+  let offlineTries = 0; // consecutive tries with no connection at all; they never use up the retry budget
   await rm(dest, { force: true });
   status.downloadDone = 0;
   status.downloadTotal = 0;
@@ -965,9 +1010,14 @@ async function httpFile(url, dest, { referer } = {}) {
     let res;
     try {
       res = await fetchFollow(url, headers, cookie, stopSignal);
+      if (offlineTries) { log("info", "Connection is back"); offlineTries = 0; }
     } catch (err) {
       if (stopped()) throw new Cancelled("cancelled");
       last = describeError(err);
+      if (isOffline(err)) {
+        offlineTries = (await offlineWait(offlineTries + 1, err, url)) ? 0 : offlineTries + 1;
+        continue;
+      }
       if (isTransient(err) && fails < 4) {
         fails++;
         const silent = err.name === "TimeoutError";
@@ -1967,7 +2017,10 @@ async function main() {
       continue;
     }
     runNow = false;
-    try { await runCycle(); } catch (err) { log("error", describeError(err)); }
+    try { await runCycle(); } catch (err) {
+      if (err instanceof Cancelled) log("info", "Stopped");
+      else log("error", describeError(err));
+    }
     if (cfg.once || shuttingDown) break;
     if (authFailed) {
       paused = true;
