@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         HentaiNexus → Archivist (Nexus)
 // @namespace    local.library.hentainexus
-// @version      1.4.0
+// @version      1.4.1
 // @description  Add HentaiNexus books to your Archivist library, and mark ones already in it
 // @match        https://hentainexus.com/*
 // @match        https://www.hentainexus.com/*
@@ -110,7 +110,8 @@
         box-shadow: 0 2px 8px rgba(0,0,0,.45);
         cursor: pointer;
       }
-      a[data-lib-add] { position: relative; display: inline-block; }
+      /* Only anchor the button; never change the page's own layout (no display/size changes). */
+      a[data-lib-add] { position: relative; }
       #lib-add-btn[data-kind="ok"],
       .lib-card-add[data-kind="ok"] { background: #2e7d32; }
       #lib-add-btn[data-kind="exists"],
