@@ -6,10 +6,14 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.4.2` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.4.2` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.4.3` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.4.3` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.4.3
+
+- `userscripts/nexus-hentainexus.user.js` (now 1.4.2): the Add / In library button sat about 20px past the right edge of each card on hentainexus.com, because the link around a card is wider than the card you see. The button is now placed from the card picture's own top-right corner and follows it when the window changes size. The page layout is still untouched. Update the script in Tampermonkey; the container is unchanged apart from the version number
 
 ## 0.4.2
 
