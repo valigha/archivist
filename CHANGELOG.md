@@ -6,10 +6,15 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.4.4` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.4.4` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.9.1` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.9.1` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.9.1
+
+- Test build ahead of 1.0.0. The code is the same as 0.4.4 (Nexus and Folio apps, browser scripts, key field, manual adds overriding the blacklist); only the version number changes. If something breaks, roll back to `0.4.4`
+- Browser scripts are unchanged: Folio 1.4.0, Nexus 1.4.3
 
 ## 0.4.4
 
