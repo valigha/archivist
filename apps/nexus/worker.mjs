@@ -1520,6 +1520,13 @@ function snapshot() {
   return { ...status, log: logBuffer.slice(-120), now: new Date().toISOString() };
 }
 
+// Is this HentaiNexus id already a book in the library? Looks only in the folder it would be in.
+async function libraryHasId(id) {
+  let names;
+  try { names = await readdir(libraryDir(id)); } catch { return false; }
+  return names.some((n) => n.toLowerCase().endsWith(".cbz") && idFromName(n) === id);
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -1837,6 +1844,20 @@ function startServer(port) {
         wake();
         json(res, 200, snapshot());
       }).catch((err) => json(res, 400, { error: err.message }));
+      return;
+    }
+    if (url.pathname === "/api/library/hentainexus/exists") {
+      if (req.method !== "POST") return json(res, 404, { ok: false, error: "not found" });
+      if (!authorized(req.headers["x-api-key"])) { req.resume(); return json(res, 401, { ok: false, error: "unauthorized" }); }
+      readBody(req).then(async (body) => {
+        const raw = body && Array.isArray(body.ids) ? body.ids : null;
+        if (!raw || raw.length > 50 || !raw.every((x) => typeof x === "string" && /^[1-9]\d{0,12}$/.test(x))) {
+          return json(res, 400, { ok: false, error: "bad request" });
+        }
+        const found = [];
+        for (const id of new Set(raw)) if (await libraryHasId(Number(id))) found.push(id);
+        json(res, 200, { ok: true, exists: found });
+      }).catch(() => json(res, 400, { ok: false, error: "bad request" }));
       return;
     }
     if (url.pathname === "/api/import" && req.method === "POST") {

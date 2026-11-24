@@ -18,6 +18,8 @@ services:
       # Shared by both apps. Give one app its own value with a prefix, e.g.
       # FOLIO_REQUEST_DELAY_MS / NEXUS_REQUEST_DELAY_MS.
       SLEEP_INTERVAL: "3600"
+      # Key for the browser userscripts (sent as X-Api-Key). Blank = add-on API off.
+      LIBRARY_IMPORT_KEY: ""
       FOLIO_REQUEST_DELAY_MS: "2000"
       NEXUS_REQUEST_DELAY_MS: "1500"
     volumes:
