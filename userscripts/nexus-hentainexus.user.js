@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         HentaiNexus → Archivist (Nexus)
 // @namespace    local.library.hentainexus
-// @version      1.4.1
+// @version      1.4.2
 // @description  Add HentaiNexus books to your Archivist library, and mark ones already in it
 // @match        https://hentainexus.com/*
 // @match        https://www.hentainexus.com/*
@@ -254,6 +254,18 @@
     }
   }
 
+  // The link around a card can be wider than the card you see, so pin the button to the
+  // picture's own top-right corner instead of the link's. Only the button moves; the page does not.
+  function place(anchor, btn) {
+    const img = anchor.querySelector("img");
+    if (!img) return;
+    const a = anchor.getBoundingClientRect();
+    const i = img.getBoundingClientRect();
+    if (!i.width) return;
+    btn.style.top = Math.max(0, Math.round(i.top - a.top)) + 6 + "px";
+    btn.style.right = Math.max(0, Math.round(a.right - i.right)) + 6 + "px";
+  }
+
   function bindCard(anchor) {
     const id = idFromHref(anchor.getAttribute("href"));
     if (!id) return;
@@ -271,7 +283,13 @@
         add(btn, current, cardTitle(anchor));
       });
       anchor.appendChild(btn);
+      const img = anchor.querySelector("img");
+      if (img) {
+        img.addEventListener("load", () => place(anchor, btn));
+        if (window.ResizeObserver) new ResizeObserver(() => place(anchor, btn)).observe(anchor);
+      }
     }
+    place(anchor, btn);
     if (btn.dataset.galleryId !== id) {
       checked.delete(id);
       btn.dataset.galleryId = id;
