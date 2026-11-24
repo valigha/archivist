@@ -854,6 +854,12 @@ async function readIds(path) {
   } catch { return []; }
 }
 
+async function unblacklist(id) {
+  const ids = await readIds(cfg.dont);
+  if (!ids.includes(id)) return;
+  await writeFile(cfg.dont, ids.filter((x) => x !== id).map((x) => `${x}\n`).join(""));
+}
+
 async function blacklist(id) {
   await mkdir(dirname(cfg.dont), { recursive: true });
   const have = new Set(await readIds(cfg.dont));
@@ -1325,8 +1331,15 @@ async function downloadGallery(id, have, opts = {}) {
 
 async function takeOne(id, have, skip, opts = {}) {
   try {
-    if (skip.has(id)) return "blacklisted";
     if (have.has(id)) return "have";
+    if (skip.has(id)) {
+      if (!opts.queued) return "blacklisted";
+      // You asked for this one yourself, so a blacklist entry does not stop it. The tag
+      // safety check still runs in downloadGallery and will blacklist it again if it fails.
+      log("info", `#${id} was on the blacklist; a manual add overrides that`);
+      skip.delete(id);
+      await unblacklist(id);
+    }
     return await downloadGallery(id, have, opts);
   } catch (err) {
     if (err instanceof Cancelled) {

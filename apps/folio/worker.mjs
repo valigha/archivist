@@ -791,6 +791,17 @@ async function removeDownloadme() {
   }
 }
 
+async function removeBlacklist(id) {
+  if (!cfg.DONTDOWNLOADME_FILEPATH) return;
+  try {
+    const existing = await readIdFile(cfg.DONTDOWNLOADME_FILEPATH);
+    if (!existing.includes(id)) return;
+    await writeFile(cfg.DONTDOWNLOADME_FILEPATH, existing.filter((x) => x !== id).map((x) => `${x}\n`).join(""));
+  } catch (err) {
+    log("warn", `Could not update blacklist: ${err instanceof Error ? err.message : err}`);
+  }
+}
+
 async function appendBlacklist(id) {
   if (!cfg.DONTDOWNLOADME_FILEPATH) return;
   try {
@@ -1103,8 +1114,14 @@ async function drainWantQueue(haveArg, skipArg, cdnArg) {
       let title = "";
       try {
         if (have.has(id)) result = "have";
-        else if (skip.has(id)) result = "blacklisted";
         else {
+          if (skip.has(id)) {
+            // You asked for this one yourself, so a blacklist entry does not stop it. The tag
+            // safety check still runs in downloadGallery and will blacklist it again if it fails.
+            log("info", `#${id} was on the blacklist; a manual add overrides that`);
+            skip.delete(id);
+            await removeBlacklist(id);
+          }
           const ok = await downloadGallery(id, cdn, have);
           result = ok ? "wrote" : "skipped";
           title = status.currentTitle || "";
