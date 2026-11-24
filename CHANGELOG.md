@@ -6,10 +6,18 @@ Every version is kept as its own image tag and GitHub Release, so you can go bac
 | Unraid Repository | Meaning |
 | --- | --- |
 | `ghcr.io/valigha/archivist:latest` | newest, may change |
-| `ghcr.io/valigha/archivist:0.3.0` | that version, frozen |
-| `ghcr.io/valigha/archivist:v0.3.0` | same image, `v` prefix |
+| `ghcr.io/valigha/archivist:0.4.0` | that version, frozen |
+| `ghcr.io/valigha/archivist:v0.4.0` | same image, `v` prefix |
 
 To roll back: Unraid → Docker → edit the container → set **Repository** to the older version tag → Apply.
+
+## 0.4.0
+
+- **Browser add-on for both apps.** New `userscripts/` folder with two Tampermonkey scripts: `folio-nhentai.user.js` (nhentai.net) and `nexus-hentainexus.user.js` (hentainexus.com). Each shows "In library" on books you already have and an **Add** button on the ones you don't
+- **New field in the Unraid template: `LIBRARY_IMPORT_KEY`.** It is the key the scripts send (as `X-Api-Key`). One variable covers both apps. Leave it blank and the add-on API stays switched off (requests get 401)
+- Nexus gained the "is it in the library" check the Folio side already had: `POST /nexus/api/library/hentainexus/exists` with `{"ids":["123","456"]}`
+- Through the combined container the paths carry the app prefix: `/folio/api/import/nhentai`, `/folio/api/library/nhentai/exists`, `/nexus/api/import`, `/nexus/api/library/hentainexus/exists`. Scripts from the separate Folio container need those prefixes and the new address and port
+- The Nexus script could not be tried against the live site. If its buttons do not show on a page, tell me which page and I will adjust it
 
 ## 0.3.0
 

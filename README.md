@@ -20,6 +20,10 @@ Plain names are shared by both apps (`LIBRARY_SPLIT`, `SLEEP_INTERVAL`, `PUID`, 
 
 Files in the library: Folio names are `<id> <title>.cbz`. Nexus names are `<id> <title> [HN].cbz`, with the tag `[HN]` at the end, so the two sites' ids never clash and both apps still sort and show titles the same way. Set `FILE_TAG` (shared by both apps) to use a different tag. Older Nexus files named `HN<id> <title>.cbz` are renamed to the new style automatically the first time the container starts (set `RENAME_OLD_FILES=0` to switch that off).
 
+## Browser add-on (Tampermonkey)
+
+Two scripts in `userscripts/` add an **Add** button and an **In library** marker to nhentai.net (Folio) and hentainexus.com (Nexus). Set a key in the container (`LIBRARY_IMPORT_KEY`, one variable for both apps) and put the same key in each script's `DEFAULTS` (or Tampermonkey menu → Library settings). Address: `http://<host>:8090`, with `/folio/...` or `/nexus/...` in front of the API paths as set in the scripts. Nexus must be logged in to accept an add; a logged-out Nexus answers 409 and the button says so.
+
 ## Versions and rollback
 
 See `CHANGELOG.md`. Every version has an image tag and a GitHub Release. To go back, set the container's Repository to an older tag, for example `ghcr.io/valigha/archivist:0.1.0`.
